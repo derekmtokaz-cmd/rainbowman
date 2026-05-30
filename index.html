@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rainbowman</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hud" aria-label="Game status">
+        <div>
+          <h1>Rainbowman</h1>
+          <p>Reach the prism. Jumping cycles your color.</p>
+        </div>
+        <div class="hud-right">
+          <div class="rainbow-cycle" aria-label="Rainbow color order">
+            <div id="rainbowBar" class="rainbow-bar"></div>
+          </div>
+          <div class="health" aria-label="Health">
+            <span>HP</span>
+            <div id="healthBar" class="health-bar"></div>
+          </div>
+          <div class="controls">Move: A/D or Arrows | Jump: W/Up/Space | Restart: R</div>
+        </div>
+      </header>
+
+      <canvas id="game" width="1200" height="675" aria-label="Rainbow platformer game"></canvas>
+
+      <p id="status" class="status" aria-live="polite">Current color: Red</p>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
