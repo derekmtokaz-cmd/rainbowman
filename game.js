@@ -18,7 +18,7 @@ const ENEMY_HEIGHT = 24;
 const GOAL_COLOR_INDEX = "goal";
 const LEVEL_LIBRARY_STORAGE_KEY = "rainbowman.levels.v1";
 const SAVED_LEVEL_ZERO_NAME = "Level 0";
-const PUBLISHED_LEVEL_ZERO_URL = "levels/level-0.json";
+const PUBLISHED_LEVEL_URL = "levels/level-1.json";
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -340,26 +340,26 @@ function randomActiveColorIndex() {
   return Math.floor(Math.random() * LEVEL.activePalette.length);
 }
 
-async function loadPublishedLevelZero() {
+async function loadPublishedLevel() {
   try {
-    const response = await fetch(PUBLISHED_LEVEL_ZERO_URL, { cache: "no-store" });
+    const response = await fetch(PUBLISHED_LEVEL_URL, { cache: "no-store" });
     if (!response.ok) {
       console.warn(
-        `Rainbowman: failed to load ${PUBLISHED_LEVEL_ZERO_URL} (${response.status}); checking browser-saved Level 0.`,
+        `Rainbowman: failed to load ${PUBLISHED_LEVEL_URL} (${response.status}); checking browser-saved Level 0.`,
       );
       return null;
     }
 
     const level = sanitizeRuntimeLevel(await response.json());
     if (!level) {
-      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_ZERO_URL} is invalid; checking browser-saved Level 0.`);
+      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_URL} is invalid; checking browser-saved Level 0.`);
       return null;
     }
 
-    console.info(`Rainbowman: loaded published level ${PUBLISHED_LEVEL_ZERO_URL}.`);
+    console.info(`Rainbowman: loaded published level ${PUBLISHED_LEVEL_URL}.`);
     return level;
   } catch {
-    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_ZERO_URL}; checking browser-saved Level 0.`);
+    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_URL}; checking browser-saved Level 0.`);
     return null;
   }
 }
@@ -1053,7 +1053,7 @@ function loop() {
 }
 
 async function initGame() {
-  LEVEL = (await loadPublishedLevelZero()) || loadSavedLevelZero() || DEFAULT_LEVEL;
+  LEVEL = (await loadPublishedLevel()) || loadSavedLevelZero() || DEFAULT_LEVEL;
   resetGame();
   loop();
 }
