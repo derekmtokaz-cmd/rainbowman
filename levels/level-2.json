@@ -481,6 +481,12 @@
       "y": 128,
       "direction": 1,
       "colorIndex": 1
+    },
+    {
+      "x": 832,
+      "y": 544,
+      "direction": 1,
+      "colorIndex": 1
     }
   ]
 }
