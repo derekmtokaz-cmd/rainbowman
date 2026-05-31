@@ -75,11 +75,12 @@ const player = {
 };
 
 let platforms = [];
-const PLAYER_ACCEL = 0.72;
-const PLAYER_MAX_SPEED = 5.4;
+const PLAYER_ACCEL = 1.0;
+const PLAYER_MAX_SPEED = 5.2;
 const RIDING_ACCEL = PLAYER_ACCEL / 2;
 const RIDING_MAX_SPEED = PLAYER_MAX_SPEED / 2;
-const PLAYER_FRICTION = 0.78;
+const PLAYER_FRICTION = 0.55;
+const PLAYER_STOP_EPSILON = 0.08;
 const MAX_REACHABLE_JUMP_HEIGHT = 150;
 const MAX_REACHABLE_DROP = 120;
 const MAX_REACHABLE_JUMP_DISTANCE = 220;
@@ -577,6 +578,7 @@ function applyHorizontalInput(accel, maxSpeed) {
   if (!movingLeft && !movingRight) player.vx *= PLAYER_FRICTION;
 
   player.vx = clamp(player.vx, -maxSpeed, maxSpeed);
+  if (Math.abs(player.vx) < PLAYER_STOP_EPSILON) player.vx = 0;
 }
 
 function updateEnemies() {
