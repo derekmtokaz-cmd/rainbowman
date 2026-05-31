@@ -30,6 +30,7 @@ const ENEMY_H = 24;
 const PICK_TOLERANCE = 10;
 const LEVEL_LIBRARY_STORAGE_KEY = "rainbowman.levels.v1";
 const GOAL_COLOR_INDEX = "goal";
+const ROTATING_COLOR_INDEX = "rotate";
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -163,7 +164,9 @@ function togglePaletteColor(masterIndex, enabled) {
     renderPaletteOptions();
   }
 
-  activeColorIndex = Math.min(activeColorIndex, draft.activePalette.length - 1);
+  activeColorIndex = isSpecialPlatformColor(activeColorIndex)
+    ? activeColorIndex
+    : Math.min(activeColorIndex, draft.activePalette.length - 1);
   normalizeColorIndexes();
   renderPaintColors();
   drawTrayPreviews();
@@ -172,6 +175,7 @@ function togglePaletteColor(masterIndex, enabled) {
 }
 
 function clampColorIndexAfterRemoval(colorIndex, removedPosition) {
+  if (isSpecialPlatformColor(colorIndex)) return colorIndex;
   if (removedPosition < 0) return Math.min(colorIndex, draft.activePalette.length - 1);
   if (colorIndex > removedPosition) return colorIndex - 1;
   return Math.min(colorIndex, draft.activePalette.length - 1);
@@ -180,7 +184,9 @@ function clampColorIndexAfterRemoval(colorIndex, removedPosition) {
 function normalizeColorIndexes() {
   draft.blocks = draft.blocks.map((block) => ({
     ...block,
-    colorIndex: Math.min(block.colorIndex, draft.activePalette.length - 1),
+    colorIndex: isSpecialPlatformColor(block.colorIndex)
+      ? block.colorIndex
+      : Math.min(block.colorIndex, draft.activePalette.length - 1),
   }));
   draft.enemies = draft.enemies.map((enemy) => ({
     ...enemy,
@@ -219,21 +225,33 @@ function renderPaintColors() {
   });
   paintColorsEl.append(goalButton);
 
+  const rotatingButton = document.createElement("button");
+  rotatingButton.type = "button";
+  rotatingButton.className = `paint-swatch rotating-swatch${activeColorIndex === ROTATING_COLOR_INDEX ? " active" : ""}`;
+  rotatingButton.title = "Rotating";
+  rotatingButton.addEventListener("click", () => {
+    activeColorIndex = ROTATING_COLOR_INDEX;
+    renderPaintColors();
+    drawTrayPreviews();
+    setStatus("Paint color: rotating");
+  });
+  paintColorsEl.append(rotatingButton);
+
   drawTrayPreviews();
 }
 
 function drawTrayPreviews() {
-  const color = isGoalColor(activeColorIndex) ? "#f8fbff" : getActiveColorValue(activeColorIndex);
+  const color = getPaintPreviewBackground(activeColorIndex);
   const startColor = getActiveColorValue(0);
 
   for (const preview of assetTrayEl.querySelectorAll(".platform-preview")) {
-    preview.style.backgroundColor = color;
+    preview.style.background = color;
   }
   for (const preview of assetTrayEl.querySelectorAll(".mini-enemy")) {
-    preview.style.backgroundColor = color;
+    preview.style.background = isSpecialPlatformColor(activeColorIndex) ? getActiveColorValue(0) : color;
   }
   for (const preview of assetTrayEl.querySelectorAll(".mini-character")) {
-    preview.style.backgroundColor = startColor;
+    preview.style.background = startColor;
   }
 }
 
@@ -364,7 +382,7 @@ function createTrayAsset(tile) {
       w: ENEMY_W,
       h: ENEMY_H,
       direction: Number(enemyDirectionEl.value),
-      colorIndex: isGoalColor(activeColorIndex) ? 0 : activeColorIndex,
+      colorIndex: isSpecialPlatformColor(activeColorIndex) ? 0 : activeColorIndex,
     };
   }
 
@@ -785,6 +803,7 @@ function createBlock(data) {
 
 function normalizeBlockColorIndex(colorIndex) {
   if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
+  if (isRotatingColor(colorIndex)) return ROTATING_COLOR_INDEX;
   return Math.min(colorIndex ?? 0, draft.activePalette.length - 1);
 }
 
@@ -824,7 +843,9 @@ function undo() {
   ensureBlockIds();
   selectedAsset = null;
   dragState = null;
-  activeColorIndex = Math.min(activeColorIndex, draft.activePalette.length - 1);
+  activeColorIndex = isSpecialPlatformColor(activeColorIndex)
+    ? activeColorIndex
+    : Math.min(activeColorIndex, draft.activePalette.length - 1);
   renderPaletteOptions();
   renderPaintColors();
   exportLevel(false);
@@ -876,16 +897,52 @@ function drawBlocks() {
 function drawPlatformBlock(x, y, w, colorIndex, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = isGoalColor(colorIndex) ? "#f8fbff" : getActiveColorValue(colorIndex);
-  ctx.fillRect(x, y, w, TILE);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
-  ctx.fillRect(x + 5, y + 4, Math.max(0, w - 10), 4);
+
+  if (isRotatingColor(colorIndex)) {
+    drawRotatingPlatformBlock(x, y, w);
+    ctx.globalAlpha = alpha;
+  } else {
+    ctx.fillStyle = isGoalColor(colorIndex) ? "#f8fbff" : getActiveColorValue(colorIndex);
+    ctx.fillRect(x, y, w, TILE);
+  }
+
+  if (!isRotatingColor(colorIndex)) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
+    ctx.fillRect(x + 5, y + 4, Math.max(0, w - 10), 4);
+  }
+
   ctx.fillStyle = "rgba(0, 0, 0, 0.26)";
   ctx.fillRect(x, y + TILE - 7, w, 7);
   ctx.strokeStyle = "#07101c";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, TILE - 2);
   ctx.restore();
+}
+
+function drawRotatingPlatformBlock(x, y, w) {
+  const stripeWidth = Math.max(8, Math.ceil(w / draft.activePalette.length));
+
+  for (let i = 0; i < Math.ceil(w / stripeWidth); i++) {
+    ctx.fillStyle = getActiveColorValue(i % draft.activePalette.length);
+    ctx.fillRect(x + i * stripeWidth, y, Math.min(stripeWidth, w - i * stripeWidth), TILE);
+  }
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+  ctx.fillRect(x + 5, y + 4, Math.max(0, w - 10), 4);
+  ctx.fillStyle = "rgba(248, 251, 255, 0.82)";
+  ctx.fillRect(x + w - 9, y + 5, 4, 4);
+  ctx.fillRect(x + w - 14, y + 5, 4, 4);
+  ctx.fillRect(x + w - 9, y + 10, 4, 4);
+}
+
+function getPaintPreviewBackground(colorIndex) {
+  if (isGoalColor(colorIndex)) return "#f8fbff";
+  if (isRotatingColor(colorIndex)) {
+    return `linear-gradient(90deg, ${draft.activePalette
+      .map((_, index) => getActiveColorValue(index))
+      .join(", ")})`;
+  }
+  return getActiveColorValue(colorIndex);
 }
 
 function drawStart() {
@@ -1045,12 +1102,21 @@ function sortBlocks() {
 
 function getActiveColorValue(activeIndex = activeColorIndex) {
   if (isGoalColor(activeIndex)) return "#f8fbff";
+  if (isRotatingColor(activeIndex)) return getActiveColorValue(0);
   const masterIndex = draft.activePalette[activeIndex] ?? draft.activePalette[0] ?? 0;
   return MASTER_COLORS[masterIndex].value;
 }
 
 function isGoalColor(colorIndex) {
   return colorIndex === GOAL_COLOR_INDEX;
+}
+
+function isRotatingColor(colorIndex) {
+  return colorIndex === ROTATING_COLOR_INDEX;
+}
+
+function isSpecialPlatformColor(colorIndex) {
+  return isGoalColor(colorIndex) || isRotatingColor(colorIndex);
 }
 
 function setStatus(message) {

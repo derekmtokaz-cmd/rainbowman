@@ -1,0 +1,486 @@
+{
+  "activePalette": [
+    0,
+    2,
+    4,
+    6
+  ],
+  "start": {
+    "x": 64,
+    "y": 606
+  },
+  "platforms": [
+    {
+      "x": 256,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 640,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 800,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 992,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 1088,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": "goal"
+        }
+      ]
+    },
+    {
+      "x": 864,
+      "y": 192,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 96,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 448,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 832,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 928,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 960,
+      "y": 256,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 32,
+      "y": 320,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 320,
+      "y": 320,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 256,
+      "y": 352,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 352,
+      "y": 352,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 704,
+      "y": 352,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 800,
+      "y": 352,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 96,
+      "y": 384,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 384,
+      "y": 384,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 672,
+      "y": 384,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 192,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 416,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 800,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 896,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 1024,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 448,
+      "y": 448,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 3
+        },
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 32,
+          "colorIndex": 1
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 800,
+      "y": 448,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 96,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 1024,
+      "y": 448,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 64,
+          "colorIndex": 2
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 320,
+      "y": 544,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 160,
+      "y": 576,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 704,
+      "y": 576,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 3
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 832,
+      "y": 576,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 1
+        },
+        {
+          "w": 96,
+          "colorIndex": 1
+        },
+        {
+          "w": 96,
+          "colorIndex": 1
+        },
+        {
+          "w": 64,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 256,
+      "y": 608,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 448,
+      "y": 608,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        },
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 32,
+          "colorIndex": 3
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 2
+        },
+        {
+          "w": 32,
+          "colorIndex": 3
+        }
+      ]
+    },
+    {
+      "x": 32,
+      "y": 640,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 384,
+      "y": 640,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "x": 640,
+      "y": 416,
+      "direction": -1,
+      "colorIndex": 0
+    },
+    {
+      "x": 160,
+      "y": 192,
+      "direction": -1,
+      "colorIndex": 2
+    },
+    {
+      "x": 480,
+      "y": 192,
+      "direction": -1,
+      "colorIndex": 0
+    },
+    {
+      "x": 288,
+      "y": 128,
+      "direction": 1,
+      "colorIndex": 3
+    },
+    {
+      "x": 640,
+      "y": 128,
+      "direction": 1,
+      "colorIndex": 1
+    }
+  ]
+}

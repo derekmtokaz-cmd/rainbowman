@@ -370,6 +370,10 @@ select {
   background: #f8fbff;
 }
 
+.rotating-swatch {
+  background: linear-gradient(90deg, #ff3b30 0 33%, #ffcc00 33% 66%, #007aff 66% 100%);
+}
+
 .editor-stage {
   min-width: 0;
 }

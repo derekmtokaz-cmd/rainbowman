@@ -16,7 +16,8 @@ const PLAYER_HEIGHT = 34;
 const ENEMY_WIDTH = 28;
 const ENEMY_HEIGHT = 24;
 const GOAL_COLOR_INDEX = "goal";
-const PUBLISHED_LEVEL_URL = "levels/level-1.json";
+const ROTATING_COLOR_INDEX = "rotate";
+const PUBLISHED_LEVEL_URLS = ["levels/level-1.json", "levels/level-2.json"];
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -65,6 +66,8 @@ let ridingEnemy = null;
 let colorLockedMote = null;
 let damageTextTimer = 0;
 let damageText = "Ow!";
+let levelStartTime = 0;
+let currentLevelIndex = 0;
 
 const player = {
   x: LEVEL.start.x,
@@ -95,6 +98,7 @@ const PLAYER_FRICTION = 0.55;
 const PLAYER_STOP_EPSILON = 0.08;
 const DAMAGE_TEXT_DURATION = 30;
 const DAMAGE_TEXT_OPTIONS = ["Ow!", "Ouch!", "Owie!"];
+const ROTATING_COLOR_INTERVAL = 5000;
 const MAX_REACHABLE_JUMP_HEIGHT = 150;
 const MAX_REACHABLE_DROP = 120;
 const MAX_REACHABLE_JUMP_DISTANCE = 220;
@@ -115,6 +119,7 @@ function resetGame() {
   ignoreNextLandingDamage = true;
   currentGroundSpace = null;
   damageTextTimer = 0;
+  levelStartTime = performance.now();
   clearMoteRidingState();
   validatePlatformDensity(LEVEL.platforms);
   validatePlatformReachability(LEVEL.platforms);
@@ -354,26 +359,28 @@ function randomActiveColorIndex() {
   return Math.floor(Math.random() * LEVEL.activePalette.length);
 }
 
-async function loadPublishedLevel() {
+async function loadPublishedLevel(index) {
+  const url = PUBLISHED_LEVEL_URLS[index];
+
   try {
-    const response = await fetch(PUBLISHED_LEVEL_URL, { cache: "no-store" });
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       console.warn(
-        `Rainbowman: failed to load ${PUBLISHED_LEVEL_URL} (${response.status}); using default level.`,
+        `Rainbowman: failed to load ${url} (${response.status}); using default level.`,
       );
       return null;
     }
 
     const level = sanitizeRuntimeLevel(await response.json());
     if (!level) {
-      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_URL} is invalid; using default level.`);
+      console.warn(`Rainbowman: ${url} is invalid; using default level.`);
       return null;
     }
 
-    console.info(`Rainbowman: loaded published level ${PUBLISHED_LEVEL_URL}.`);
+    console.info(`Rainbowman: loaded published level ${url}.`);
     return level;
   } catch {
-    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_URL}; using default level.`);
+    console.warn(`Rainbowman: could not fetch ${url}; using default level.`);
     return null;
   }
 }
@@ -455,16 +462,37 @@ function sanitizeEnemySpecs(enemies, activePaletteLength) {
 
 function sanitizeBlockColorIndex(colorIndex, activePaletteLength) {
   if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
+  if (isRotatingColor(colorIndex)) return ROTATING_COLOR_INDEX;
   return clamp(Number(colorIndex) || 0, 0, activePaletteLength - 1);
 }
 
 function normalizeBlockColorIndex(colorIndex) {
   if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
+  if (isRotatingColor(colorIndex)) return ROTATING_COLOR_INDEX;
   return clamp(colorIndex, 0, LEVEL.activePalette.length - 1);
 }
 
 function isGoalColor(colorIndex) {
   return colorIndex === GOAL_COLOR_INDEX;
+}
+
+function isRotatingColor(colorIndex) {
+  return colorIndex === ROTATING_COLOR_INDEX;
+}
+
+function getRotatingColorIndex() {
+  const elapsed = Math.max(0, performance.now() - levelStartTime);
+  return Math.floor(elapsed / ROTATING_COLOR_INTERVAL) % LEVEL.activePalette.length;
+}
+
+function getEffectiveBlockColorIndex(colorIndex) {
+  if (isRotatingColor(colorIndex)) return getRotatingColorIndex();
+  return colorIndex;
+}
+
+function getEffectiveBlockColorValue(colorIndex) {
+  if (isGoalColor(colorIndex)) return "#f8fbff";
+  return getActiveColorValue(getEffectiveBlockColorIndex(colorIndex));
 }
 
 function hasGoalBlocks() {
@@ -485,7 +513,7 @@ function getActiveColorValue(activeIndex = colorIndex) {
 
 function updateStatus() {
   if (won) {
-    statusEl.textContent = "You reached the goal. Press R to play again.";
+    statusEl.textContent = `You reached the goal. ${getWinPrompt()}`;
   } else if (gameOver) {
     statusEl.textContent = "Game over. Press R to restart.";
   } else {
@@ -501,6 +529,30 @@ function winLevel() {
   player.vx = 0;
   player.vy = 0;
   updateStatus();
+}
+
+function hasNextLevel() {
+  return currentLevelIndex < PUBLISHED_LEVEL_URLS.length - 1;
+}
+
+async function continueToNextLevel() {
+  if (!won || !hasNextLevel()) return;
+
+  const nextLevelIndex = currentLevelIndex + 1;
+  const nextLevel = await loadPublishedLevel(nextLevelIndex);
+  if (!nextLevel) return;
+
+  startLevel(nextLevelIndex, nextLevel);
+}
+
+function startLevel(index, level) {
+  currentLevelIndex = index;
+  LEVEL = level;
+  resetGame();
+}
+
+function getWinPrompt() {
+  return hasNextLevel() ? "Press C to continue." : "Press R to restart.";
 }
 
 function updateHealthBar() {
@@ -914,7 +966,7 @@ function getPlatformSpaceAtX(platform, x) {
 
   return {
     spaceIndex: block.blockIndex,
-    colorIndex: block.colorIndex,
+    colorIndex: getEffectiveBlockColorIndex(block.colorIndex),
   };
 }
 
@@ -931,7 +983,7 @@ function draw() {
   drawDamageText();
 
   if (won) {
-    drawMessage("Prism reached!", "Press R to restart");
+    drawMessage("Prism reached!", getWinPrompt());
   } else if (gameOver) {
     drawMessage("Game over", "Press R to try again");
   }
@@ -980,7 +1032,7 @@ function drawBackground() {
 function drawPlatforms() {
   for (const p of platforms) {
     for (const block of p.blocks) {
-      const color = isGoalColor(block.colorIndex) ? "#f8fbff" : getActiveColorValue(block.colorIndex);
+      const color = getEffectiveBlockColorValue(block.colorIndex);
       const x = block.x;
 
       ctx.fillStyle = color;
@@ -992,6 +1044,13 @@ function drawPlatforms() {
       ctx.strokeStyle = "#07101c";
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 1, p.y + 1, block.w - 2, p.h - 2);
+
+      if (isRotatingColor(block.colorIndex)) {
+        ctx.fillStyle = "rgba(248, 251, 255, 0.82)";
+        ctx.fillRect(x + block.w - 9, p.y + 5, 4, 4);
+        ctx.fillRect(x + block.w - 14, p.y + 5, 4, 4);
+        ctx.fillRect(x + block.w - 9, p.y + 10, 4, 4);
+      }
     }
   }
 }
@@ -1062,8 +1121,7 @@ function loop() {
 }
 
 async function initGame() {
-  LEVEL = (await loadPublishedLevel()) || DEFAULT_LEVEL;
-  resetGame();
+  startLevel(0, (await loadPublishedLevel(0)) || DEFAULT_LEVEL);
   loop();
 }
 
@@ -1074,6 +1132,11 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "KeyR") {
     resetGame();
+    return;
+  }
+
+  if (event.code === "KeyC") {
+    continueToNextLevel();
     return;
   }
 
