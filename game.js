@@ -16,8 +16,6 @@ const PLAYER_HEIGHT = 34;
 const ENEMY_WIDTH = 28;
 const ENEMY_HEIGHT = 24;
 const GOAL_COLOR_INDEX = "goal";
-const LEVEL_LIBRARY_STORAGE_KEY = "rainbowman.levels.v1";
-const SAVED_LEVEL_ZERO_NAME = "Level 0";
 const PUBLISHED_LEVEL_URL = "levels/level-1.json";
 
 const MASTER_COLORS = [
@@ -345,71 +343,23 @@ async function loadPublishedLevel() {
     const response = await fetch(PUBLISHED_LEVEL_URL, { cache: "no-store" });
     if (!response.ok) {
       console.warn(
-        `Rainbowman: failed to load ${PUBLISHED_LEVEL_URL} (${response.status}); checking browser-saved Level 0.`,
+        `Rainbowman: failed to load ${PUBLISHED_LEVEL_URL} (${response.status}); using default level.`,
       );
       return null;
     }
 
     const level = sanitizeRuntimeLevel(await response.json());
     if (!level) {
-      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_URL} is invalid; checking browser-saved Level 0.`);
+      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_URL} is invalid; using default level.`);
       return null;
     }
 
     console.info(`Rainbowman: loaded published level ${PUBLISHED_LEVEL_URL}.`);
     return level;
   } catch {
-    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_URL}; checking browser-saved Level 0.`);
+    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_URL}; using default level.`);
     return null;
   }
-}
-
-function loadSavedLevelZero() {
-  try {
-    const levels = JSON.parse(localStorage.getItem(LEVEL_LIBRARY_STORAGE_KEY) || "[]");
-    if (!Array.isArray(levels)) {
-      console.warn("Rainbowman: saved level library is not an array; using default level.");
-      return null;
-    }
-
-    if (levels.length === 0) {
-      console.info("Rainbowman: no saved levels found; using default level.");
-      return null;
-    }
-
-    const record = levels.find(
-      (candidate) =>
-        typeof candidate?.name === "string" &&
-        normalizeLevelName(candidate.name) === normalizeLevelName(SAVED_LEVEL_ZERO_NAME),
-    );
-
-    if (!record) {
-      console.warn(
-        `Rainbowman: saved "${SAVED_LEVEL_ZERO_NAME}" not found; using default level. Available saved levels:`,
-        levels.map((candidate) => candidate?.name),
-      );
-      return null;
-    }
-
-    const level = sanitizeRuntimeLevel(record.level);
-    if (!level) {
-      console.warn(`Rainbowman: saved "${record.name}" is invalid; using default level.`);
-      return null;
-    }
-
-    console.info(`Rainbowman: loaded saved level "${record.name}".`);
-    return level;
-  } catch {
-    console.warn("Rainbowman: saved levels could not be read; using default level.");
-    return null;
-  }
-}
-
-function normalizeLevelName(name) {
-  return String(name ?? "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
 }
 
 function sanitizeRuntimeLevel(level) {
@@ -1053,7 +1003,7 @@ function loop() {
 }
 
 async function initGame() {
-  LEVEL = (await loadPublishedLevel()) || loadSavedLevelZero() || DEFAULT_LEVEL;
+  LEVEL = (await loadPublishedLevel()) || DEFAULT_LEVEL;
   resetGame();
   loop();
 }
