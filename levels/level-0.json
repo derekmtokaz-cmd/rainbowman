@@ -1,0 +1,233 @@
+{
+  "activePalette": [
+    0,
+    2,
+    4
+  ],
+  "start": {
+    "x": 64,
+    "y": 606
+  },
+  "platforms": [
+    {
+      "x": 704,
+      "y": 96,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 960,
+      "y": 128,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": "goal"
+        }
+      ]
+    },
+    {
+      "x": 832,
+      "y": 160,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 352,
+      "y": 192,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 736,
+      "y": 192,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 608,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 448,
+      "y": 288,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 2
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 224,
+      "y": 320,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 1
+        },
+        {
+          "w": 32,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 736,
+      "y": 352,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 544,
+      "y": 384,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 128,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 1
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 960,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 480,
+      "y": 512,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 1
+        }
+      ]
+    },
+    {
+      "x": 608,
+      "y": 512,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 768,
+      "y": 512,
+      "blocks": [
+        {
+          "w": 64,
+          "colorIndex": 2
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 224,
+      "y": 576,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 1
+        },
+        {
+          "w": 32,
+          "colorIndex": 0
+        },
+        {
+          "w": 96,
+          "colorIndex": 2
+        }
+      ]
+    },
+    {
+      "x": 0,
+      "y": 640,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "x": 768,
+      "y": 480,
+      "direction": 1,
+      "colorIndex": 1
+    },
+    {
+      "x": 224,
+      "y": 384,
+      "direction": 1,
+      "colorIndex": 2
+    }
+  ]
+}

@@ -11,6 +11,14 @@ const HEIGHT = canvas.height;
 const TILE = 32;
 const COLOR_SPACE_WIDTH = TILE * 2;
 const MAX_HP = 10;
+const PLAYER_WIDTH = 26;
+const PLAYER_HEIGHT = 34;
+const ENEMY_WIDTH = 28;
+const ENEMY_HEIGHT = 24;
+const GOAL_COLOR_INDEX = "goal";
+const LEVEL_LIBRARY_STORAGE_KEY = "rainbowman.levels.v1";
+const SAVED_LEVEL_ZERO_NAME = "Level 0";
+const PUBLISHED_LEVEL_ZERO_URL = "levels/level-0.json";
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -22,28 +30,30 @@ const MASTER_COLORS = [
   { name: "Violet", value: "#af52de" },
 ];
 
-const LEVEL = {
+const DEFAULT_LEVEL = {
   activePalette: [0, 2, 4],
-  start: { x: 50, y: 606 },
-  goal: { platformIndex: 9, x: 1060, w: 42, h: 74, gap: 4 },
+  start: { x: 64, y: 606 },
+  goal: { platformIndex: 9, x: 1056, w: 42, h: 74, gap: 4 },
   platforms: [
-    { x: 0, y: 640, spaces: 5 },
-    { x: 290, y: 570, spaces: 3 },
-    { x: 540, y: 500, spaces: 3 },
-    { x: 785, y: 500, spaces: 2 },
-    { x: 700, y: 430, spaces: 3 },
-    { x: 915, y: 360, spaces: 3 },
-    { x: 680, y: 290, spaces: 2 },
-    { x: 900, y: 290, spaces: 3 },
-    { x: 770, y: 220, spaces: 3 },
-    { x: 1000, y: 150, spaces: 3 },
+    { x: 0, y: 640, blocks: [{ w: 64, colorIndex: 0 }, { w: 64, colorIndex: 1 }, { w: 64, colorIndex: 1 }, { w: 64, colorIndex: 2 }, { w: 64, colorIndex: 2 }] },
+    { x: 288, y: 570, blocks: [{ w: 64, colorIndex: 0 }, { w: 64, colorIndex: 1 }, { w: 64, colorIndex: 1 }] },
+    { x: 544, y: 500, blocks: [{ w: 64, colorIndex: 2 }, { w: 64, colorIndex: 0 }, { w: 64, colorIndex: 1 }] },
+    { x: 800, y: 500, blocks: [{ w: 64, colorIndex: 1 }, { w: 64, colorIndex: 2 }] },
+    { x: 704, y: 430, blocks: [{ w: 64, colorIndex: 2 }, { w: 64, colorIndex: 2 }, { w: 64, colorIndex: 1 }] },
+    { x: 928, y: 360, blocks: [{ w: 64, colorIndex: 0 }, { w: 64, colorIndex: 2 }, { w: 64, colorIndex: 2 }] },
+    { x: 672, y: 290, blocks: [{ w: 64, colorIndex: 1 }, { w: 64, colorIndex: 2 }] },
+    { x: 896, y: 290, blocks: [{ w: 64, colorIndex: 0 }, { w: 64, colorIndex: 0 }, { w: 64, colorIndex: 1 }] },
+    { x: 768, y: 220, blocks: [{ w: 64, colorIndex: 2 }, { w: 64, colorIndex: 2 }, { w: 64, colorIndex: 1 }] },
+    { x: 992, y: 150, blocks: [{ w: 64, colorIndex: 0 }, { w: 64, colorIndex: "goal" }, { w: 64, colorIndex: 1 }] },
   ],
   enemies: [
-    { platformIndex: 2, offset: 54, direction: 1 },
-    { platformIndex: 4, offset: 92, direction: -1 },
-    { platformIndex: 8, offset: 38, direction: 1 },
+    { x: 608, y: 476, direction: 1, colorIndex: 2 },
+    { x: 800, y: 406, direction: -1, colorIndex: 1 },
+    { x: 800, y: 196, direction: 1, colorIndex: 2 },
   ],
 };
+
+let LEVEL = DEFAULT_LEVEL;
 
 const keys = new Set();
 let colorIndex = 0;
@@ -54,20 +64,19 @@ let ignoreNextLandingDamage = true;
 let currentGroundSpace = null;
 let enemies = [];
 let ridingEnemy = null;
+let colorLockedMote = null;
 
 const player = {
   x: LEVEL.start.x,
   y: LEVEL.start.y,
-  w: 26,
-  h: 34,
+  w: PLAYER_WIDTH,
+  h: PLAYER_HEIGHT,
   vx: 0,
   vy: 0,
   grounded: false,
 };
 
 let platforms = [];
-
-let goal = null;
 const PLAYER_ACCEL = 0.72;
 const PLAYER_MAX_SPEED = 5.4;
 const RIDING_ACCEL = PLAYER_ACCEL / 2;
@@ -92,11 +101,11 @@ function resetGame() {
   hp = MAX_HP;
   ignoreNextLandingDamage = true;
   currentGroundSpace = null;
-  ridingEnemy = null;
+  clearMoteRidingState();
   validatePlatformDensity(LEVEL.platforms);
   validatePlatformReachability(LEVEL.platforms);
   validatePlatformClearance(LEVEL.platforms);
-  randomizePlatformColors();
+  buildPlatforms();
   resetGoal();
   resetEnemies();
   updateStatus();
@@ -104,39 +113,60 @@ function resetGame() {
   updateRainbowBar();
 }
 
-function randomizePlatformColors() {
-  platforms = LEVEL.platforms.map((spec) => platform(spec.x, spec.y, spec.spaces));
+function buildPlatforms() {
+  platforms = LEVEL.platforms.map(createPlatform);
 }
 
-function platform(x, y, spaces) {
-  const colors = Array.from({ length: spaces }, () => randomActiveColorIndex());
-  return { x, y, w: spaces * COLOR_SPACE_WIDTH, h: TILE, colors };
+function createPlatform(spec) {
+  let offset = 0;
+  const blocks = spec.blocks.map((block, blockIndex) => {
+    const normalized = {
+      x: spec.x + offset,
+      y: spec.y,
+      w: block.w,
+      h: TILE,
+      colorIndex: normalizeBlockColorIndex(block.colorIndex),
+      blockIndex,
+    };
+    offset += block.w;
+    return normalized;
+  });
+
+  return { x: spec.x, y: spec.y, w: offset, h: TILE, blocks };
 }
 
 function resetGoal() {
-  const platform = platforms[LEVEL.goal.platformIndex];
-  const gap = LEVEL.goal.gap ?? 4;
-  const y = clamp(platform.y - LEVEL.goal.h - gap, 0, HEIGHT - LEVEL.goal.h);
+  if (hasGoalBlocks() || !LEVEL.goal) return;
 
-  goal = {
-    x: LEVEL.goal.x,
+  const platform = platforms[LEVEL.goal.platformIndex];
+  const x = clamp(LEVEL.goal.x ?? 0, 0, WIDTH - COLOR_SPACE_WIDTH);
+  const y = platform
+    ? clamp(platform.y - TILE, 0, HEIGHT - TILE)
+    : clamp(LEVEL.goal.y ?? 0, 0, HEIGHT - TILE);
+
+  platforms.push({
+    x,
     y,
-    w: LEVEL.goal.w,
-    h: LEVEL.goal.h,
-  };
+    w: COLOR_SPACE_WIDTH,
+    h: TILE,
+    blocks: [{ x, y, w: COLOR_SPACE_WIDTH, h: TILE, colorIndex: GOAL_COLOR_INDEX, blockIndex: 0 }],
+  });
 }
 
 function getPlatformSpaces(platformSpec, platformIndex) {
-  return Array.from({ length: platformSpec.spaces }, (_, spaceIndex) => {
-    const x = platformSpec.x + spaceIndex * COLOR_SPACE_WIDTH;
+  let offset = 0;
+
+  return platformSpec.blocks.map((block, spaceIndex) => {
+    const x = platformSpec.x + offset;
+    offset += block.w;
 
     return {
       platformIndex,
       spaceIndex,
       x,
       y: platformSpec.y,
-      w: COLOR_SPACE_WIDTH,
-      centerX: x + COLOR_SPACE_WIDTH / 2,
+      w: block.w,
+      centerX: x + block.w / 2,
     };
   });
 }
@@ -165,7 +195,7 @@ function validatePlatformReachability(platformSpecs) {
     if (
       playerFeetY === spec.y &&
       startCenterX >= spec.x &&
-      startCenterX <= spec.x + spec.spaces * COLOR_SPACE_WIDTH
+      startCenterX <= spec.x + getPlatformSpecWidth(spec)
     ) {
       reachablePlatforms.add(i);
     }
@@ -252,20 +282,26 @@ function validatePlatformDensity(platformSpecs) {
 }
 
 function platformsHorizontallyOverlap(a, b) {
-  const aRight = a.x + a.spaces * COLOR_SPACE_WIDTH;
-  const bRight = b.x + b.spaces * COLOR_SPACE_WIDTH;
+  const aRight = a.x + getPlatformSpecWidth(a);
+  const bRight = b.x + getPlatformSpecWidth(b);
   return a.x < bRight && aRight > b.x;
 }
 
+function getPlatformSpecWidth(spec) {
+  return spec.blocks.reduce((total, block) => total + block.w, 0);
+}
+
 function resetEnemies() {
-  enemies = LEVEL.enemies.map(createEnemy);
+  enemies = LEVEL.enemies.map(createEnemy).filter(Boolean);
 }
 
 function createEnemy(spec) {
-  const platform = platforms[spec.platformIndex];
-  const w = 28;
-  const h = 24;
-  const x = platform.x + clamp(spec.offset, 0, platform.w - w);
+  const w = ENEMY_WIDTH;
+  const h = ENEMY_HEIGHT;
+  const platform = findEnemyPlatform(spec) || platforms[0];
+  if (!platform) return null;
+
+  const x = clamp(spec.x ?? platform.x, platform.x, platform.x + platform.w - w);
   const space = getPlatformSpaceAtX(platform, x + w / 2);
 
   return {
@@ -275,17 +311,198 @@ function createEnemy(spec) {
     w,
     h,
     dx: 0,
-    direction: spec.direction,
+    direction: spec.direction || 1,
     speed: 1.1,
-    colorIndex: randomActiveColorIndex(),
+    colorIndex: clamp(spec.colorIndex ?? randomActiveColorIndex(), 0, LEVEL.activePalette.length - 1),
     currentSpaceIndex: space.spaceIndex,
     currentPlatformColorIndex: space.colorIndex,
     alive: true,
   };
 }
 
+function findEnemyPlatform(spec) {
+  if (Number.isInteger(spec.platformIndex) && platforms[spec.platformIndex]) {
+    return platforms[spec.platformIndex];
+  }
+
+  const enemyCenterX = (spec.x ?? 0) + ENEMY_WIDTH / 2;
+  const feetY = (spec.y ?? 0) + ENEMY_HEIGHT;
+
+  return platforms.find(
+    (platform) =>
+      enemyCenterX >= platform.x &&
+      enemyCenterX <= platform.x + platform.w &&
+      Math.abs(feetY - platform.y) <= TILE,
+  );
+}
+
 function randomActiveColorIndex() {
   return Math.floor(Math.random() * LEVEL.activePalette.length);
+}
+
+async function loadPublishedLevelZero() {
+  try {
+    const response = await fetch(PUBLISHED_LEVEL_ZERO_URL, { cache: "no-store" });
+    if (!response.ok) {
+      console.warn(
+        `Rainbowman: failed to load ${PUBLISHED_LEVEL_ZERO_URL} (${response.status}); checking browser-saved Level 0.`,
+      );
+      return null;
+    }
+
+    const level = sanitizeRuntimeLevel(await response.json());
+    if (!level) {
+      console.warn(`Rainbowman: ${PUBLISHED_LEVEL_ZERO_URL} is invalid; checking browser-saved Level 0.`);
+      return null;
+    }
+
+    console.info(`Rainbowman: loaded published level ${PUBLISHED_LEVEL_ZERO_URL}.`);
+    return level;
+  } catch {
+    console.warn(`Rainbowman: could not fetch ${PUBLISHED_LEVEL_ZERO_URL}; checking browser-saved Level 0.`);
+    return null;
+  }
+}
+
+function loadSavedLevelZero() {
+  try {
+    const levels = JSON.parse(localStorage.getItem(LEVEL_LIBRARY_STORAGE_KEY) || "[]");
+    if (!Array.isArray(levels)) {
+      console.warn("Rainbowman: saved level library is not an array; using default level.");
+      return null;
+    }
+
+    if (levels.length === 0) {
+      console.info("Rainbowman: no saved levels found; using default level.");
+      return null;
+    }
+
+    const record = levels.find(
+      (candidate) =>
+        typeof candidate?.name === "string" &&
+        normalizeLevelName(candidate.name) === normalizeLevelName(SAVED_LEVEL_ZERO_NAME),
+    );
+
+    if (!record) {
+      console.warn(
+        `Rainbowman: saved "${SAVED_LEVEL_ZERO_NAME}" not found; using default level. Available saved levels:`,
+        levels.map((candidate) => candidate?.name),
+      );
+      return null;
+    }
+
+    const level = sanitizeRuntimeLevel(record.level);
+    if (!level) {
+      console.warn(`Rainbowman: saved "${record.name}" is invalid; using default level.`);
+      return null;
+    }
+
+    console.info(`Rainbowman: loaded saved level "${record.name}".`);
+    return level;
+  } catch {
+    console.warn("Rainbowman: saved levels could not be read; using default level.");
+    return null;
+  }
+}
+
+function normalizeLevelName(name) {
+  return String(name ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function sanitizeRuntimeLevel(level) {
+  if (!level || typeof level !== "object") return null;
+  const activePalette = sanitizeActivePalette(level.activePalette);
+
+  return {
+    activePalette,
+    start: sanitizeStart(level.start),
+    goal: level.goal && typeof level.goal === "object" ? { ...level.goal } : null,
+    platforms: sanitizePlatformSpecs(level.platforms, activePalette.length),
+    enemies: sanitizeEnemySpecs(level.enemies, activePalette.length),
+  };
+}
+
+function sanitizeActivePalette(palette) {
+  if (!Array.isArray(palette)) return [...DEFAULT_LEVEL.activePalette];
+
+  const indexes = [...new Set(palette)]
+    .map((index) => Number(index))
+    .filter((index) => Number.isInteger(index) && MASTER_COLORS[index]);
+
+  return indexes.length > 0 ? indexes : [...DEFAULT_LEVEL.activePalette];
+}
+
+function sanitizeStart(start) {
+  if (!start || typeof start !== "object") return { ...DEFAULT_LEVEL.start };
+
+  return {
+    x: clamp(Number(start.x) || 0, 0, WIDTH - PLAYER_WIDTH),
+    y: clamp(Number(start.y) || 0, 0, HEIGHT - PLAYER_HEIGHT),
+  };
+}
+
+function sanitizePlatformSpecs(platforms, activePaletteLength) {
+  if (!Array.isArray(platforms)) return [];
+
+  return platforms
+    .map((platform) => {
+      if (!platform || typeof platform !== "object") return null;
+
+      const sourceBlocks = Array.isArray(platform.blocks)
+        ? platform.blocks
+        : Array.from({ length: Math.max(0, Number(platform.spaces) || 0) }, () => ({
+            w: COLOR_SPACE_WIDTH,
+            colorIndex: 0,
+          }));
+
+      const blocks = sourceBlocks
+        .map((block) => ({
+          w: clamp(Number(block?.w) || COLOR_SPACE_WIDTH, TILE, WIDTH),
+          colorIndex: sanitizeBlockColorIndex(block?.colorIndex, activePaletteLength),
+        }))
+        .filter((block) => block.w > 0);
+
+      if (blocks.length === 0) return null;
+
+      return {
+        x: clamp(Number(platform.x) || 0, 0, WIDTH),
+        y: clamp(Number(platform.y) || 0, 0, HEIGHT - TILE),
+        blocks,
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeEnemySpecs(enemies, activePaletteLength) {
+  if (!Array.isArray(enemies)) return [];
+
+  return enemies.map((enemy) => ({
+    x: clamp(Number(enemy?.x) || 0, 0, WIDTH - ENEMY_WIDTH),
+    y: clamp(Number(enemy?.y) || 0, 0, HEIGHT - ENEMY_HEIGHT),
+    direction: Number(enemy?.direction) < 0 ? -1 : 1,
+    colorIndex: clamp(Number(enemy?.colorIndex) || 0, 0, activePaletteLength - 1),
+  }));
+}
+
+function sanitizeBlockColorIndex(colorIndex, activePaletteLength) {
+  if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
+  return clamp(Number(colorIndex) || 0, 0, activePaletteLength - 1);
+}
+
+function normalizeBlockColorIndex(colorIndex) {
+  if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
+  return clamp(colorIndex, 0, LEVEL.activePalette.length - 1);
+}
+
+function isGoalColor(colorIndex) {
+  return colorIndex === GOAL_COLOR_INDEX;
+}
+
+function hasGoalBlocks() {
+  return platforms.some((platform) => platform.blocks.some((block) => isGoalColor(block.colorIndex)));
 }
 
 function getActiveColor(activeIndex = colorIndex) {
@@ -302,12 +519,21 @@ function getActiveColorValue(activeIndex = colorIndex) {
 
 function updateStatus() {
   if (won) {
-    statusEl.textContent = "You reached the prism. Press R to play again.";
+    statusEl.textContent = "You reached the goal. Press R to play again.";
   } else if (gameOver) {
     statusEl.textContent = "Game over. Press R to restart.";
   } else {
     statusEl.textContent = `Current color: ${getActiveColorName()} | HP: ${hp}/${MAX_HP}`;
   }
+}
+
+function winLevel() {
+  if (won) return;
+
+  won = true;
+  player.vx = 0;
+  player.vy = 0;
+  updateStatus();
 }
 
 function updateHealthBar() {
@@ -342,7 +568,7 @@ function jump() {
 
   player.vy = -13.6;
   player.grounded = false;
-  ridingEnemy = null;
+  clearMoteRidingState();
   currentGroundSpace = null;
   colorIndex = (colorIndex + 1) % LEVEL.activePalette.length;
   updateStatus();
@@ -368,7 +594,7 @@ function update() {
       player.grounded = true;
       currentGroundSpace = null;
     } else {
-      ridingEnemy = null;
+      clearMoteRidingState();
 
       applyHorizontalInput(PLAYER_ACCEL, PLAYER_MAX_SPEED);
       player.vy = clamp(player.vy + 0.62, -16, 15);
@@ -387,10 +613,6 @@ function update() {
       resetGame();
     }
 
-    if (rectsOverlap(player, goal)) {
-      won = true;
-      updateStatus();
-    }
   } else {
     player.vx *= 0.86;
   }
@@ -432,7 +654,13 @@ function updateEnemyPlatformColorTracking(enemy) {
   const space = getPlatformSpaceAtX(enemy.platform, enemy.x + enemy.w / 2);
 
   if (space.colorIndex !== enemy.currentPlatformColorIndex) {
-    enemy.colorIndex = (enemy.colorIndex + 1) % LEVEL.activePalette.length;
+    if (!(enemy === ridingEnemy && enemy === colorLockedMote)) {
+      enemy.colorIndex = (enemy.colorIndex + 1) % LEVEL.activePalette.length;
+
+      if (enemy === ridingEnemy && enemy.colorIndex !== colorIndex) {
+        damagePlayer();
+      }
+    }
   }
 
   enemy.currentSpaceIndex = space.spaceIndex;
@@ -441,11 +669,11 @@ function updateEnemyPlatformColorTracking(enemy) {
 
 function carryRidingPlayer() {
   if (!ridingEnemy || !ridingEnemy.alive) {
-    ridingEnemy = null;
+    clearMoteRidingState();
     return;
   }
 
-  player.x = clamp(player.x + ridingEnemy.dx, 0, WIDTH - player.w);
+  moveRidingPlayerX(ridingEnemy.dx, false);
   player.y = ridingEnemy.y - player.h;
   player.vy = 0;
   player.grounded = true;
@@ -455,15 +683,37 @@ function carryRidingPlayer() {
 function moveRidingPlayerHorizontally() {
   if (!ridingEnemy || !ridingEnemy.alive) return;
 
-  player.x = clamp(player.x + player.vx, 0, WIDTH - player.w);
+  moveRidingPlayerX(player.vx, true);
 
   if (!isPlayerSupportedByEnemy(ridingEnemy)) {
-    ridingEnemy = null;
+    clearMoteRidingState();
     player.grounded = false;
     return;
   }
 
   player.y = ridingEnemy.y - player.h;
+}
+
+function moveRidingPlayerX(deltaX, stopPlayerVelocityOnBlock) {
+  if (deltaX === 0) return;
+
+  player.x += deltaX;
+
+  for (const p of platforms) {
+    if (!rectsOverlap(player, p)) continue;
+
+    if (deltaX > 0) {
+      player.x = p.x - player.w;
+    } else {
+      player.x = p.x + p.w;
+    }
+
+    if (stopPlayerVelocityOnBlock) {
+      player.vx = 0;
+    }
+  }
+
+  player.x = clamp(player.x, 0, WIDTH - player.w);
 }
 
 function isPlayerSupportedByEnemy(enemy) {
@@ -488,12 +738,21 @@ function checkEnemyCollisions(previousPlayerY) {
 }
 
 function resolveEnemyTopCollision(enemy) {
+  const matchingMoteColor = enemy.colorIndex === colorIndex;
+
   player.y = enemy.y - player.h;
   player.vy = 0;
   player.vx = 0;
   player.grounded = true;
   currentGroundSpace = null;
   ridingEnemy = enemy;
+
+  if (matchingMoteColor) {
+    colorLockedMote = enemy;
+  } else {
+    colorLockedMote = null;
+    damagePlayer();
+  }
 }
 
 function resolveEnemyBump(enemy) {
@@ -509,6 +768,11 @@ function resolveEnemyBump(enemy) {
 
 function reverseEnemy(enemy) {
   enemy.direction *= -1;
+}
+
+function clearMoteRidingState() {
+  ridingEnemy = null;
+  colorLockedMote = null;
 }
 
 function moveHorizontally() {
@@ -566,6 +830,11 @@ function checkLandingColor(platform) {
   const centerX = player.x + player.w / 2;
   const landedColorIndex = getColorAtPlatformX(platform, centerX);
 
+  if (isGoalColor(landedColorIndex)) {
+    winLevel();
+    return;
+  }
+
   if (landedColorIndex === colorIndex) return;
 
   damagePlayer();
@@ -584,10 +853,17 @@ function checkGroundMovementColor() {
     return;
   }
 
+  if (isGoalColor(groundSpace.colorIndex)) {
+    currentGroundSpace = groundSpace;
+    winLevel();
+    return;
+  }
+
   if (
     currentGroundSpace &&
     (currentGroundSpace.platform !== groundSpace.platform ||
       currentGroundSpace.spaceIndex !== groundSpace.spaceIndex) &&
+    !isGoalColor(groundSpace.colorIndex) &&
     groundSpace.colorIndex !== colorIndex &&
     groundSpace.colorIndex !== currentGroundSpace.colorIndex
   ) {
@@ -642,12 +918,14 @@ function getColorAtPlatformX(platform, x) {
 }
 
 function getPlatformSpaceAtX(platform, x) {
-  const rawIndex = Math.floor((x - platform.x) / COLOR_SPACE_WIDTH);
-  const spaceIndex = clamp(rawIndex, 0, platform.colors.length - 1);
+  const block =
+    platform.blocks.find((candidate) => x >= candidate.x && x < candidate.x + candidate.w) ||
+    (x < platform.x ? platform.blocks[0] : null) ||
+    platform.blocks[platform.blocks.length - 1];
 
   return {
-    spaceIndex,
-    colorIndex: platform.colors[spaceIndex],
+    spaceIndex: block.blockIndex,
+    colorIndex: block.colorIndex,
   };
 }
 
@@ -658,7 +936,6 @@ function clamp(value, min, max) {
 function draw() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
-  drawGoal();
   drawPlatforms();
   drawEnemies();
   drawPlayer();
@@ -712,27 +989,25 @@ function drawBackground() {
 
 function drawPlatforms() {
   for (const p of platforms) {
-    const blocks = p.colors.length;
-
-    for (let i = 0; i < blocks; i++) {
-      const color = getActiveColorValue(p.colors[i]);
-      const x = p.x + i * COLOR_SPACE_WIDTH;
+    for (const block of p.blocks) {
+      const color = isGoalColor(block.colorIndex) ? "#f8fbff" : getActiveColorValue(block.colorIndex);
+      const x = block.x;
 
       ctx.fillStyle = color;
-      ctx.fillRect(x, p.y, COLOR_SPACE_WIDTH, p.h);
+      ctx.fillRect(x, p.y, block.w, p.h);
       ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
-      ctx.fillRect(x + 5, p.y + 4, COLOR_SPACE_WIDTH - 10, 4);
+      ctx.fillRect(x + 5, p.y + 4, Math.max(0, block.w - 10), 4);
       ctx.fillStyle = "rgba(0, 0, 0, 0.26)";
-      ctx.fillRect(x, p.y + p.h - 7, COLOR_SPACE_WIDTH, 7);
+      ctx.fillRect(x, p.y + p.h - 7, block.w, 7);
       ctx.strokeStyle = "#07101c";
       ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, p.y + 1, COLOR_SPACE_WIDTH - 2, p.h - 2);
+      ctx.strokeRect(x + 1, p.y + 1, block.w - 2, p.h - 2);
     }
   }
 }
 
 function drawPlayer() {
-  const color = getActiveColorValue();
+  const color = won ? "#f8fbff" : getActiveColorValue();
   const px = Math.round(player.x);
   const py = Math.round(player.y);
 
@@ -750,24 +1025,6 @@ function drawPlayer() {
   ctx.fillStyle = "#101722";
   ctx.fillRect(px + 7, py + 28, 6, 6);
   ctx.fillRect(px + 17, py + 28, 6, 6);
-}
-
-function drawGoal() {
-  ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
-  ctx.fillRect(goal.x - 7, goal.y - 10, goal.w + 14, goal.h + 18);
-
-  const stripeHeight = goal.h / MASTER_COLORS.length;
-  for (let i = 0; i < MASTER_COLORS.length; i++) {
-    ctx.fillStyle = MASTER_COLORS[i].value;
-    ctx.fillRect(goal.x, goal.y + i * stripeHeight, goal.w, stripeHeight + 1);
-  }
-
-  ctx.strokeStyle = "#f8fbff";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(goal.x, goal.y, goal.w, goal.h);
-
-  ctx.fillStyle = "#f8fbff";
-  ctx.fillRect(goal.x + 12, goal.y - 18, 18, 18);
 }
 
 function drawMessage(title, subtitle) {
@@ -795,6 +1052,12 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+async function initGame() {
+  LEVEL = (await loadPublishedLevelZero()) || loadSavedLevelZero() || DEFAULT_LEVEL;
+  resetGame();
+  loop();
+}
+
 window.addEventListener("keydown", (event) => {
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) {
     event.preventDefault();
@@ -816,5 +1079,4 @@ window.addEventListener("keyup", (event) => {
   keys.delete(event.code);
 });
 
-resetGame();
-loop();
+initGame();

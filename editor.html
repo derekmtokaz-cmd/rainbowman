@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rainbowman Level Creator</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="shell editor-shell">
+      <header class="hud" aria-label="Editor controls">
+        <div>
+          <h1>Rainbowman Creator</h1>
+          <p>Paint platforms, place objects, then export a level config.</p>
+        </div>
+        <div class="hud-right">
+          <a class="nav-link" href="index.html">Play Rainbowman</a>
+        </div>
+      </header>
+
+      <section class="editor-layout" aria-label="Level creator">
+        <aside class="editor-panel">
+          <div class="control-group">
+            <h2>Palette</h2>
+            <div id="paletteOptions" class="palette-options"></div>
+          </div>
+
+          <div class="control-group">
+            <h2>Paint</h2>
+            <div id="paintColors" class="paint-colors"></div>
+          </div>
+
+          <div class="control-group">
+            <h2>Assets</h2>
+            <div class="asset-tray" id="assetTray">
+              <button type="button" class="asset-tile platform-tile platform-small" data-asset="block" data-width="32" title="32x32 platform tile" aria-label="32x32 platform tile">
+                <span class="platform-preview"></span>
+              </button>
+              <button type="button" class="asset-tile platform-tile platform-medium" data-asset="block" data-width="64" title="64x32 platform tile" aria-label="64x32 platform tile">
+                <span class="platform-preview"></span>
+              </button>
+              <button type="button" class="asset-tile platform-tile platform-large" data-asset="block" data-width="96" title="96x32 platform tile" aria-label="96x32 platform tile">
+                <span class="platform-preview"></span>
+              </button>
+              <button type="button" class="asset-tile character-tile" data-asset="start" title="Start marker" aria-label="Start marker">
+                <span class="mini-character"></span>
+              </button>
+              <button type="button" class="asset-tile enemy-tile" data-asset="enemy" title="Mote" aria-label="Mote">
+                <span class="mini-enemy"></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group control-row">
+            <label for="enemyDirection">Mote</label>
+            <select id="enemyDirection">
+              <option value="1">Right</option>
+              <option value="-1">Left</option>
+            </select>
+          </div>
+
+          <div class="control-group action-row">
+            <button type="button" id="eraseModeButton">Erase</button>
+            <button type="button" id="undoButton">Undo</button>
+            <button type="button" id="clearButton">Clear</button>
+          </div>
+
+          <div class="control-group">
+            <h2>Saved Levels</h2>
+            <label class="field-label" for="levelName">Level Name</label>
+            <input id="levelName" type="text" autocomplete="off" maxlength="80">
+            <select id="savedLevels" size="5" aria-label="Saved levels"></select>
+            <div class="action-row">
+              <button type="button" id="saveLevelButton">Save</button>
+              <button type="button" id="loadLevelButton">Load</button>
+              <button type="button" id="renameLevelButton">Rename</button>
+              <button type="button" id="deleteLevelButton">Delete</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h2>Level JSON</h2>
+            <textarea id="levelJson" spellcheck="false"></textarea>
+            <div class="action-row">
+              <button type="button" id="exportButton">Export</button>
+              <button type="button" id="importButton">Import</button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="editor-stage">
+          <canvas id="editor" width="1200" height="675" aria-label="Rainbowman level editor"></canvas>
+          <p id="editorStatus" class="status" aria-live="polite">Place blocks on the grid.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="editor.js"></script>
+  </body>
+</html>
