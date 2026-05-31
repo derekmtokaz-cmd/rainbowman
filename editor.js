@@ -542,7 +542,7 @@ function buildExportLevel() {
     activePalette: [...draft.activePalette],
     start: { ...draft.start },
     platforms,
-    enemies: draft.enemies.map((enemy) => ({
+    motes: draft.enemies.map((enemy) => ({
       x: enemy.x,
       y: enemy.y,
       direction: enemy.direction,
@@ -574,8 +574,9 @@ function applyLevel(level) {
   draft.blocks = flattenPlatforms(level.platforms || []);
   draft.start = level.start || { ...DEFAULT_START };
   convertLegacyGoalToBlock(level);
+  const moteSpecs = Array.isArray(level.motes) ? level.motes : level.enemies;
 
-  draft.enemies = (level.enemies || []).map((enemy) => ({
+  draft.enemies = (moteSpecs || []).map((enemy) => ({
     x: enemy.x,
     y: enemy.y,
     direction: enemy.direction || 1,

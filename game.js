@@ -523,13 +523,14 @@ function getProgressionIndexForUrl(url) {
 function sanitizeRuntimeLevel(level) {
   if (!level || typeof level !== "object") return null;
   const activePalette = sanitizeActivePalette(level.activePalette);
+  const moteSpecs = Array.isArray(level.motes) ? level.motes : level.enemies;
 
   return {
     activePalette,
     start: sanitizeStart(level.start),
     goal: level.goal && typeof level.goal === "object" ? { ...level.goal } : null,
     platforms: sanitizePlatformSpecs(level.platforms, activePalette.length),
-    enemies: sanitizeEnemySpecs(level.enemies, activePalette.length),
+    enemies: sanitizeEnemySpecs(moteSpecs, activePalette.length),
   };
 }
 
