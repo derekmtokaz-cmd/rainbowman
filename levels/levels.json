@@ -1,0 +1,26 @@
+[
+  {
+    "id": "level-0",
+    "name": "Level 0",
+    "url": "levels/level-0.json",
+    "live": false
+  },
+  {
+    "id": "level-1",
+    "name": "Level 1",
+    "url": "levels/level-1.json",
+    "live": true
+  },
+  {
+    "id": "level-2",
+    "name": "Level 2",
+    "url": "levels/level-2.json",
+    "live": true
+  },
+  {
+    "id": "slope-test",
+    "name": "Slope Test",
+    "url": "levels/slope-test.json",
+    "live": false
+  }
+]

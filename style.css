@@ -30,7 +30,7 @@ body {
 }
 
 .shell {
-  width: min(100vw - 32px, 1240px);
+  width: min(100vw - 32px, 1430px);
 }
 
 .hud {
@@ -131,6 +131,50 @@ canvas {
   background: #101722;
   image-rendering: pixelated;
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.38);
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1200px) 170px;
+  gap: 16px;
+  align-items: start;
+}
+
+.game-stage {
+  min-width: 0;
+}
+
+.level-sidebar {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 2px solid var(--line);
+  background: rgb(17 24 39 / 0.78);
+}
+
+.level-sidebar h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.level-list {
+  display: grid;
+  gap: 7px;
+}
+
+.level-button {
+  width: 100%;
+  justify-content: start;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.level-button.active {
+  border-color: #f8fbff;
+  background: #20314d;
+  color: #ffcc00;
 }
 
 #game {
@@ -298,6 +342,18 @@ select {
   width: 62px;
 }
 
+.slope-tile .platform-preview {
+  width: 24px;
+}
+
+.slope-preview-right {
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+.slope-preview-left {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
 .mini-character,
 .mini-enemy {
   display: block;
@@ -401,6 +457,18 @@ select {
 
   .editor-layout {
     grid-template-columns: 1fr;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .level-sidebar {
+    order: 2;
+  }
+
+  .level-list {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   }
 
   .editor-panel {

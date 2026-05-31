@@ -5,6 +5,7 @@ const ctx = canvas.getContext("2d");
 const statusEl = document.getElementById("status");
 const healthBarEl = document.getElementById("healthBar");
 const rainbowBarEl = document.getElementById("rainbowBar");
+const levelListEl = document.getElementById("levelList");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -17,7 +18,14 @@ const ENEMY_WIDTH = 28;
 const ENEMY_HEIGHT = 24;
 const GOAL_COLOR_INDEX = "goal";
 const ROTATING_COLOR_INDEX = "rotate";
+const SLOPE_DOWN_RIGHT_TYPE = "slopeDownRight";
+const SLOPE_DOWN_LEFT_TYPE = "slopeDownLeft";
+const LEVEL_MANIFEST_URL = "levels/levels.json";
 const PUBLISHED_LEVEL_URLS = ["levels/level-1.json", "levels/level-2.json"];
+const FALLBACK_LEVEL_SELECTOR_ITEMS = [
+  { id: "level-1", name: "Level 1", url: "levels/level-1.json", live: true },
+  { id: "level-2", name: "Level 2", url: "levels/level-2.json", live: true },
+];
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -59,7 +67,6 @@ let colorIndex = 0;
 let won = false;
 let gameOver = false;
 let hp = MAX_HP;
-let ignoreNextLandingDamage = true;
 let currentGroundSpace = null;
 let enemies = [];
 let ridingEnemy = null;
@@ -68,6 +75,8 @@ let damageTextTimer = 0;
 let damageText = "Ow!";
 let levelStartTime = 0;
 let currentLevelIndex = 0;
+let currentLevelUrl = PUBLISHED_LEVEL_URLS[0];
+let levelSelectorItems = [];
 
 const player = {
   x: LEVEL.start.x,
@@ -99,6 +108,8 @@ const PLAYER_STOP_EPSILON = 0.08;
 const DAMAGE_TEXT_DURATION = 30;
 const DAMAGE_TEXT_OPTIONS = ["Ow!", "Ouch!", "Owie!"];
 const ROTATING_COLOR_INTERVAL = 5000;
+const SLOPE_SLIDE_SPEED = 0.31;
+const SLOPE_SNAP_BUFFER = 1;
 const MAX_REACHABLE_JUMP_HEIGHT = 150;
 const MAX_REACHABLE_DROP = 120;
 const MAX_REACHABLE_JUMP_DISTANCE = 220;
@@ -116,7 +127,6 @@ function resetGame() {
   won = false;
   gameOver = false;
   hp = MAX_HP;
-  ignoreNextLandingDamage = true;
   currentGroundSpace = null;
   damageTextTimer = 0;
   levelStartTime = performance.now();
@@ -126,10 +136,20 @@ function resetGame() {
   validatePlatformClearance(LEVEL.platforms);
   buildPlatforms();
   resetGoal();
+  initializeStartingGround();
   resetEnemies();
   updateStatus();
   updateHealthBar();
   updateRainbowBar();
+}
+
+function initializeStartingGround() {
+  const groundSpace = findCurrentGroundSpace();
+
+  if (!groundSpace) return;
+
+  player.grounded = true;
+  currentGroundSpace = groundSpace;
 }
 
 function buildPlatforms() {
@@ -139,15 +159,18 @@ function buildPlatforms() {
 function createPlatform(spec) {
   let offset = 0;
   const blocks = spec.blocks.map((block, blockIndex) => {
+    const type = normalizeBlockType(block.type);
+    const w = isSlopeType(type) ? TILE : block.w;
     const normalized = {
       x: spec.x + offset,
       y: spec.y,
-      w: block.w,
+      w,
       h: TILE,
       colorIndex: normalizeBlockColorIndex(block.colorIndex),
+      type,
       blockIndex,
     };
-    offset += block.w;
+    offset += w;
     return normalized;
   });
 
@@ -321,14 +344,18 @@ function createEnemy(spec) {
   if (!platform) return null;
 
   const x = clamp(spec.x ?? platform.x, platform.x, platform.x + platform.w - w);
-  const space = getPlatformSpaceAtX(platform, x + w / 2);
+  const walkBounds = getEnemyWalkBounds(platform, x + w / 2);
+  if (!walkBounds) return null;
+  const boundedX = clamp(x, walkBounds.left, walkBounds.right - w);
+  const space = getPlatformSpaceAtX(platform, boundedX + w / 2);
 
   return {
     platform,
-    x,
+    x: boundedX,
     y: platform.y - h,
     w,
     h,
+    walkBounds,
     dx: 0,
     direction: spec.direction || 1,
     speed: 1.1,
@@ -355,13 +382,54 @@ function findEnemyPlatform(spec) {
   );
 }
 
+function getEnemyWalkBounds(platform, centerX) {
+  const normalBlocks = platform.blocks.filter((block) => !isSlopeBlock(block));
+  if (normalBlocks.length === 0) return null;
+
+  let containingBlock = normalBlocks.find((block) => isXWithinBlock(centerX, block));
+
+  if (!containingBlock) {
+    containingBlock = normalBlocks.reduce((closest, block) => {
+      const blockCenter = block.x + block.w / 2;
+      const closestCenter = closest.x + closest.w / 2;
+      return Math.abs(blockCenter - centerX) < Math.abs(closestCenter - centerX) ? block : closest;
+    }, normalBlocks[0]);
+  }
+
+  let left = containingBlock.x;
+  let right = containingBlock.x + containingBlock.w;
+  let expanded = true;
+
+  while (expanded) {
+    expanded = false;
+
+    for (const block of normalBlocks) {
+      const blockLeft = block.x;
+      const blockRight = block.x + block.w;
+
+      if (blockRight === left) {
+        left = blockLeft;
+        expanded = true;
+      } else if (blockLeft === right) {
+        right = blockRight;
+        expanded = true;
+      }
+    }
+  }
+
+  return { left, right };
+}
+
 function randomActiveColorIndex() {
   return Math.floor(Math.random() * LEVEL.activePalette.length);
 }
 
 async function loadPublishedLevel(index) {
   const url = PUBLISHED_LEVEL_URLS[index];
+  return loadLevelFromUrl(url, "published level");
+}
 
+async function loadLevelFromUrl(url, label = "level") {
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
@@ -377,12 +445,79 @@ async function loadPublishedLevel(index) {
       return null;
     }
 
-    console.info(`Rainbowman: loaded published level ${url}.`);
+    console.info(`Rainbowman: loaded ${label} ${url}.`);
     return level;
   } catch {
     console.warn(`Rainbowman: could not fetch ${url}; using default level.`);
     return null;
   }
+}
+
+async function loadLevelSelectorItems() {
+  try {
+    const response = await fetch(LEVEL_MANIFEST_URL, { cache: "no-store" });
+    if (!response.ok) {
+      console.warn(`Rainbowman: failed to load ${LEVEL_MANIFEST_URL}; using fallback selector.`);
+      return [...FALLBACK_LEVEL_SELECTOR_ITEMS];
+    }
+
+    const parsed = await response.json();
+    const items = sanitizeLevelSelectorItems(parsed);
+    return items.length > 0 ? items : [...FALLBACK_LEVEL_SELECTOR_ITEMS];
+  } catch {
+    console.warn(`Rainbowman: could not fetch ${LEVEL_MANIFEST_URL}; using fallback selector.`);
+    return [...FALLBACK_LEVEL_SELECTOR_ITEMS];
+  }
+}
+
+function sanitizeLevelSelectorItems(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter((item) => item && typeof item === "object" && item.live === true)
+    .map((item) => ({
+      id: String(item.id || item.url || ""),
+      name: String(item.name || item.id || "Level"),
+      url: String(item.url || ""),
+      live: true,
+    }))
+    .filter((item) => item.id && item.url);
+}
+
+async function initLevelSelector() {
+  if (!levelListEl) return;
+
+  levelSelectorItems = await loadLevelSelectorItems();
+  renderLevelSelector();
+}
+
+function renderLevelSelector() {
+  if (!levelListEl) return;
+
+  levelListEl.innerHTML = "";
+
+  for (const item of levelSelectorItems) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `level-button${item.url === currentLevelUrl ? " active" : ""}`;
+    button.textContent = item.name;
+    button.addEventListener("click", () => selectLevel(item));
+    levelListEl.append(button);
+  }
+}
+
+async function selectLevel(item) {
+  const level = await loadLevelFromUrl(item.url, "selected level");
+  if (!level) {
+    statusEl.textContent = `Could not load ${item.name}.`;
+    return;
+  }
+
+  startLevel(getProgressionIndexForUrl(item.url), level, item.url);
+}
+
+function getProgressionIndexForUrl(url) {
+  return PUBLISHED_LEVEL_URLS.indexOf(url);
 }
 
 function sanitizeRuntimeLevel(level) {
@@ -432,10 +567,16 @@ function sanitizePlatformSpecs(platforms, activePaletteLength) {
           }));
 
       const blocks = sourceBlocks
-        .map((block) => ({
-          w: clamp(Number(block?.w) || COLOR_SPACE_WIDTH, TILE, WIDTH),
-          colorIndex: sanitizeBlockColorIndex(block?.colorIndex, activePaletteLength),
-        }))
+        .map((block) => {
+          const type = sanitizeBlockType(block?.type);
+          return {
+            w: isSlopeType(type)
+              ? TILE
+              : clamp(Number(block?.w) || COLOR_SPACE_WIDTH, TILE, WIDTH),
+            colorIndex: sanitizeBlockColorIndex(block?.colorIndex, activePaletteLength),
+            type,
+          };
+        })
         .filter((block) => block.w > 0);
 
       if (blocks.length === 0) return null;
@@ -472,12 +613,36 @@ function normalizeBlockColorIndex(colorIndex) {
   return clamp(colorIndex, 0, LEVEL.activePalette.length - 1);
 }
 
+function sanitizeBlockType(type) {
+  return isSlopeType(type) ? type : null;
+}
+
+function normalizeBlockType(type) {
+  return isSlopeType(type) ? type : null;
+}
+
 function isGoalColor(colorIndex) {
   return colorIndex === GOAL_COLOR_INDEX;
 }
 
 function isRotatingColor(colorIndex) {
   return colorIndex === ROTATING_COLOR_INDEX;
+}
+
+function isSlopeDownRightType(type) {
+  return type === SLOPE_DOWN_RIGHT_TYPE;
+}
+
+function isSlopeDownLeftType(type) {
+  return type === SLOPE_DOWN_LEFT_TYPE;
+}
+
+function isSlopeType(type) {
+  return isSlopeDownRightType(type) || isSlopeDownLeftType(type);
+}
+
+function isSlopeBlock(block) {
+  return isSlopeType(block.type);
 }
 
 function getRotatingColorIndex() {
@@ -532,7 +697,7 @@ function winLevel() {
 }
 
 function hasNextLevel() {
-  return currentLevelIndex < PUBLISHED_LEVEL_URLS.length - 1;
+  return currentLevelIndex >= 0 && currentLevelIndex < PUBLISHED_LEVEL_URLS.length - 1;
 }
 
 async function continueToNextLevel() {
@@ -545,10 +710,12 @@ async function continueToNextLevel() {
   startLevel(nextLevelIndex, nextLevel);
 }
 
-function startLevel(index, level) {
+function startLevel(index, level, url = PUBLISHED_LEVEL_URLS[index] || "") {
   currentLevelIndex = index;
+  currentLevelUrl = url;
   LEVEL = level;
   resetGame();
+  renderLevelSelector();
 }
 
 function getWinPrompt() {
@@ -633,6 +800,7 @@ function update() {
 
       moveHorizontally();
       moveVertically();
+      applySlopeGroundAdjustment();
       checkGroundMovementColor();
     }
 
@@ -668,12 +836,13 @@ function updateEnemies() {
 
     const oldX = enemy.x;
     enemy.x += enemy.speed * enemy.direction;
+    const bounds = enemy.walkBounds || { left: enemy.platform.x, right: enemy.platform.x + enemy.platform.w };
 
-    if (enemy.x <= enemy.platform.x) {
-      enemy.x = enemy.platform.x;
+    if (enemy.x <= bounds.left) {
+      enemy.x = bounds.left;
       reverseEnemy(enemy);
-    } else if (enemy.x + enemy.w >= enemy.platform.x + enemy.platform.w) {
-      enemy.x = enemy.platform.x + enemy.platform.w - enemy.w;
+    } else if (enemy.x + enemy.w >= bounds.right) {
+      enemy.x = bounds.right - enemy.w;
       reverseEnemy(enemy);
     }
 
@@ -756,15 +925,20 @@ function isPlayerSupportedByEnemy(enemy) {
 
 function checkEnemyCollisions(previousPlayerY) {
   const previousBottom = previousPlayerY + player.h;
+  const currentBottom = player.y + player.h;
 
   for (const enemy of enemies) {
-    if (!enemy.alive || enemy === ridingEnemy || !rectsOverlap(player, enemy)) continue;
+    if (!enemy.alive || enemy === ridingEnemy) continue;
 
-    const landingOnEnemy = player.vy >= 0 && previousBottom <= enemy.y + 6;
+    const horizontallyOverlaps = player.x < enemy.x + enemy.w && player.x + player.w > enemy.x;
+    if (!horizontallyOverlaps) continue;
+
+    const crossedEnemyTop = previousBottom <= enemy.y + 6 && currentBottom >= enemy.y;
+    const landingOnEnemy = player.vy >= 0 && crossedEnemyTop;
 
     if (landingOnEnemy) {
       resolveEnemyTopCollision(enemy);
-    } else {
+    } else if (rectsOverlap(player, enemy)) {
       resolveEnemyBump(enemy);
     }
   }
@@ -809,44 +983,148 @@ function clearMoteRidingState() {
 }
 
 function moveHorizontally() {
+  const previousX = player.x;
+  const previousPlayer = { ...player, x: previousX };
   player.x += player.vx;
 
-  for (const p of platforms) {
-    if (!rectsOverlap(player, p)) continue;
-
-    if (player.vx > 0) {
-      player.x = p.x - player.w;
-    } else if (player.vx < 0) {
-      player.x = p.x + p.w;
-    }
-
+  if (getSlopeBodyPenetration()) {
+    player.x = previousX;
     player.vx = 0;
+    return;
+  }
+
+  if (isOverlappingBlockedSlope()) {
+    player.x = previousX;
+    player.vx = 0;
+    return;
+  }
+
+  for (const p of platforms) {
+    for (const block of p.blocks) {
+      if (isSlopeBlock(block) || !rectsOverlap(player, block)) continue;
+      if (wasAlreadyOverlappingBlock(previousPlayer, block)) continue;
+      if (isTopSupportedByBlock(block)) continue;
+
+      if (player.vx > 0) {
+        player.x = block.x - player.w;
+      } else if (player.vx < 0) {
+        player.x = block.x + block.w;
+      }
+
+      player.vx = 0;
+    }
   }
 
   player.x = clamp(player.x, 0, WIDTH - player.w);
 }
 
+function getSlopeBodyPenetration() {
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (!isSlopeBlock(block) || !rectsOverlap(player, block)) continue;
+
+      const leftProbeX = clamp(player.x + 2, block.x, block.x + block.w);
+      const rightProbeX = clamp(player.x + player.w - 2, block.x, block.x + block.w);
+      const probeY = player.y + player.h - 3;
+      const leftPenetrates = probeY > getSlopeSurfaceY(block, leftProbeX) + 1;
+      const rightPenetrates = probeY > getSlopeSurfaceY(block, rightProbeX) + 1;
+
+      if (leftPenetrates || rightPenetrates) {
+        return { platform, block };
+      }
+    }
+  }
+
+  return null;
+}
+
+function isOverlappingBlockedSlope() {
+  if (isSupportedBySolidBlock()) return false;
+
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (isSlopeBlock(block) && isMovingUpSlope(block) && rectsOverlap(player, block)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function wasAlreadyOverlappingBlock(previousPlayer, block) {
+  return rectsOverlap(previousPlayer, block);
+}
+
+function isTopSupportedByBlock(block) {
+  const feetY = player.y + player.h;
+  const horizontallySupported = player.x < block.x + block.w && player.x + player.w > block.x;
+  const verticallySupported = Math.abs(feetY - block.y) <= 2;
+
+  return horizontallySupported && verticallySupported;
+}
+
+function isSupportedBySolidBlock() {
+  const feetY = player.y + player.h;
+
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (isSlopeBlock(block)) continue;
+
+      if (isTopSupportedByBlock(block)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isMovingUpSlope(block) {
+  return (
+    (isSlopeDownRightType(block.type) && player.vx < 0) ||
+    (isSlopeDownLeftType(block.type) && player.vx > 0)
+  );
+}
+
 function moveVertically() {
   const wasGrounded = player.grounded;
+  const previousFeetY = player.y + player.h;
   player.y += player.vy;
   player.grounded = false;
   let landedPlatform = null;
 
   for (const p of platforms) {
-    if (!rectsOverlap(player, p)) continue;
+    for (const block of p.blocks) {
+      if (isSlopeBlock(block) || !rectsOverlap(player, block)) continue;
 
-    if (player.vy > 0) {
-      player.y = p.y - player.h;
+      if (player.vy > 0) {
+        player.y = block.y - player.h;
+        player.grounded = true;
+        if (!wasGrounded) {
+          checkLandingColor(p);
+        }
+        landedPlatform = p;
+      } else if (player.vy < 0) {
+        player.y = block.y + block.h;
+      }
+
+      player.vy = 0;
+    }
+  }
+
+  if (player.vy > 0) {
+    const slopeLanding = getSlopeLanding(previousFeetY);
+
+    if (slopeLanding) {
+      player.y = slopeLanding.surfaceY - player.h;
       player.grounded = true;
       if (!wasGrounded) {
-        checkLandingColor(p);
+        checkLandingColor(slopeLanding.platform);
       }
-      landedPlatform = p;
-    } else if (player.vy < 0) {
-      player.y = p.y + p.h;
+      landedPlatform = slopeLanding.platform;
+      player.vy = 0;
     }
-
-    player.vy = 0;
   }
 
   if (landedPlatform && !wasGrounded) {
@@ -854,12 +1132,72 @@ function moveVertically() {
   }
 }
 
-function checkLandingColor(platform) {
-  if (ignoreNextLandingDamage) {
-    ignoreNextLandingDamage = false;
+function getSlopeLanding(previousFeetY) {
+  const centerX = player.x + player.w / 2;
+  const currentFeetY = player.y + player.h;
+
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (!isSlopeBlock(block) || !isXWithinBlock(centerX, block)) continue;
+
+      const surfaceY = getSlopeSurfaceY(block, centerX);
+      const crossedSurface = previousFeetY <= surfaceY && currentFeetY >= surfaceY;
+
+      if (crossedSurface) {
+        return { platform, block, surfaceY };
+      }
+    }
+  }
+
+  return null;
+}
+
+function applySlopeGroundAdjustment() {
+  if (won || gameOver || ridingEnemy) return;
+
+  const wasGroundedOnSlope = isSlopeType(currentGroundSpace?.blockType);
+  if (!player.grounded && !wasGroundedOnSlope) return;
+
+  const snapDistance = Math.max(1, Math.abs(player.vx) + SLOPE_SLIDE_SPEED + SLOPE_SNAP_BUFFER);
+  const slopeGround = findCurrentSlopeGroundSpace(snapDistance);
+  if (!slopeGround) return;
+
+  snapPlayerToSlope(slopeGround);
+
+  const previousX = player.x;
+  const slideSpeed = isPressingUpSlope(slopeGround.block) ? SLOPE_SLIDE_SPEED / 2 : SLOPE_SLIDE_SPEED;
+  player.x = clamp(player.x + getSlopeSlideDirection(slopeGround.block) * slideSpeed, 0, WIDTH - player.w);
+
+  if (isOverlappingSolidBlock()) {
+    player.x = previousX;
     return;
   }
 
+  const newSlopeGround = findCurrentSlopeGroundSpace(slideSpeed + SLOPE_SNAP_BUFFER);
+  if (!newSlopeGround) return;
+
+  snapPlayerToSlope(newSlopeGround);
+}
+
+function snapPlayerToSlope(slopeGround) {
+  player.y = slopeGround.surfaceY - player.h;
+  player.vy = 0;
+  player.grounded = true;
+}
+
+function isOverlappingSolidBlock() {
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (!isSlopeBlock(block) && rectsOverlap(player, block)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function checkLandingColor(platform) {
   const centerX = player.x + player.w / 2;
   const landedColorIndex = getColorAtPlatformX(platform, centerX);
 
@@ -892,15 +1230,20 @@ function checkGroundMovementColor() {
     return;
   }
 
-  if (
-    currentGroundSpace &&
-    (currentGroundSpace.platform !== groundSpace.platform ||
-      currentGroundSpace.spaceIndex !== groundSpace.spaceIndex) &&
-    !isGoalColor(groundSpace.colorIndex) &&
-    groundSpace.colorIndex !== colorIndex &&
-    groundSpace.colorIndex !== currentGroundSpace.colorIndex
-  ) {
-    damagePlayer();
+  if (currentGroundSpace) {
+    const changedGroundSpace =
+      currentGroundSpace.platform !== groundSpace.platform ||
+      currentGroundSpace.spaceIndex !== groundSpace.spaceIndex;
+    const changedGroundColor = groundSpace.colorIndex !== currentGroundSpace.colorIndex;
+
+    if (
+      (changedGroundSpace || changedGroundColor) &&
+      !isGoalColor(groundSpace.colorIndex) &&
+      groundSpace.colorIndex !== colorIndex &&
+      changedGroundColor
+    ) {
+      damagePlayer();
+    }
   }
 
   currentGroundSpace = groundSpace;
@@ -932,15 +1275,69 @@ function findCurrentGroundSpace() {
   const feetY = player.y + player.h;
 
   for (const p of platforms) {
-    const withinX = centerX >= p.x && centerX < p.x + p.w;
-    const onTop = Math.abs(feetY - p.y) <= 1;
+    for (const block of p.blocks) {
+      if (!isXWithinBlock(centerX, block)) continue;
 
-    if (withinX && onTop) {
-      return getSpaceForPlatform(p);
+      const surfaceY = isSlopeBlock(block)
+        ? getSlopeSurfaceY(block, centerX)
+        : block.y;
+      const onTop = Math.abs(feetY - surfaceY) <= 1;
+
+      if (onTop) {
+        return getSpaceForPlatform(p);
+      }
     }
   }
 
   return null;
+}
+
+function findCurrentSlopeGroundSpace(tolerance) {
+  const centerX = player.x + player.w / 2;
+  const feetY = player.y + player.h;
+
+  for (const platform of platforms) {
+    for (const block of platform.blocks) {
+      if (!isSlopeBlock(block) || !isXWithinBlock(centerX, block)) continue;
+
+      const surfaceY = getSlopeSurfaceY(block, centerX);
+      const snapDownDistance = surfaceY - feetY;
+
+      if (snapDownDistance >= 0 && snapDownDistance <= tolerance) {
+        return { platform, block, surfaceY };
+      }
+    }
+  }
+
+  return null;
+}
+
+function isXWithinBlock(x, block) {
+  return x >= block.x && x < block.x + block.w;
+}
+
+function getSlopeSurfaceY(block, x) {
+  if (isSlopeDownLeftType(block.type)) {
+    return block.y + clamp(block.x + block.w - x, 0, block.w);
+  }
+
+  return block.y + clamp(x - block.x, 0, block.w);
+}
+
+function getSlopeSlideDirection(block) {
+  return isSlopeDownLeftType(block.type) ? -1 : 1;
+}
+
+function isPressingUpSlope(block) {
+  if (isSlopeDownRightType(block.type)) {
+    return isDown("ArrowLeft", "KeyA");
+  }
+
+  if (isSlopeDownLeftType(block.type)) {
+    return isDown("ArrowRight", "KeyD");
+  }
+
+  return false;
 }
 
 function getSpaceForPlatform(platform) {
@@ -951,6 +1348,7 @@ function getSpaceForPlatform(platform) {
     platform,
     spaceIndex: space.spaceIndex,
     colorIndex: space.colorIndex,
+    blockType: space.blockType,
   };
 }
 
@@ -967,6 +1365,7 @@ function getPlatformSpaceAtX(platform, x) {
   return {
     spaceIndex: block.blockIndex,
     colorIndex: getEffectiveBlockColorIndex(block.colorIndex),
+    blockType: block.type,
   };
 }
 
@@ -1035,6 +1434,11 @@ function drawPlatforms() {
       const color = getEffectiveBlockColorValue(block.colorIndex);
       const x = block.x;
 
+      if (isSlopeBlock(block)) {
+        drawSlopeBlock(block, color);
+        continue;
+      }
+
       ctx.fillStyle = color;
       ctx.fillRect(x, p.y, block.w, p.h);
       ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
@@ -1044,15 +1448,40 @@ function drawPlatforms() {
       ctx.strokeStyle = "#07101c";
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 1, p.y + 1, block.w - 2, p.h - 2);
-
-      if (isRotatingColor(block.colorIndex)) {
-        ctx.fillStyle = "rgba(248, 251, 255, 0.82)";
-        ctx.fillRect(x + block.w - 9, p.y + 5, 4, 4);
-        ctx.fillRect(x + block.w - 14, p.y + 5, 4, 4);
-        ctx.fillRect(x + block.w - 9, p.y + 10, 4, 4);
-      }
     }
   }
+}
+
+function drawSlopeBlock(block, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  if (isSlopeDownLeftType(block.type)) {
+    ctx.moveTo(block.x + block.w, block.y);
+    ctx.lineTo(block.x + block.w, block.y + block.h);
+    ctx.lineTo(block.x, block.y + block.h);
+  } else {
+    ctx.moveTo(block.x, block.y);
+    ctx.lineTo(block.x + block.w, block.y + block.h);
+    ctx.lineTo(block.x, block.y + block.h);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "#07101c";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if (isSlopeDownLeftType(block.type)) {
+    ctx.moveTo(block.x + block.w - 4, block.y + 5);
+    ctx.lineTo(block.x + 5, block.y + block.h - 4);
+  } else {
+    ctx.moveTo(block.x + 4, block.y + 5);
+    ctx.lineTo(block.x + block.w - 5, block.y + block.h - 4);
+  }
+  ctx.stroke();
 }
 
 function drawPlayer() {
@@ -1122,6 +1551,7 @@ function loop() {
 
 async function initGame() {
   startLevel(0, (await loadPublishedLevel(0)) || DEFAULT_LEVEL);
+  await initLevelSelector();
   loop();
 }
 
@@ -1140,7 +1570,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.code === "ArrowUp" || event.code === "KeyW" || event.code === "Space") {
+  if ((event.code === "ArrowUp" || event.code === "KeyW" || event.code === "Space") && !event.repeat) {
     jump();
   }
 

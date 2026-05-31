@@ -1,0 +1,152 @@
+{
+  "activePalette": [
+    0,
+    2,
+    4
+  ],
+  "start": {
+    "x": 768,
+    "y": 512
+  },
+  "platforms": [
+    {
+      "x": 96,
+      "y": 192,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 0,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 224,
+      "y": 224,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 256,
+      "y": 256,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    },
+    {
+      "x": 416,
+      "y": 416,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": "rotate"
+        },
+        {
+          "w": 96,
+          "colorIndex": 0
+        },
+        {
+          "w": 32,
+          "colorIndex": 1,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 640,
+      "y": 448,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 896,
+      "y": 448,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2,
+          "type": "slopeDownLeft"
+        }
+      ]
+    },
+    {
+      "x": 672,
+      "y": 480,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 864,
+      "y": 480,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 1,
+          "type": "slopeDownLeft"
+        }
+      ]
+    },
+    {
+      "x": 704,
+      "y": 512,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 2,
+          "type": "slopeDownRight"
+        }
+      ]
+    },
+    {
+      "x": 832,
+      "y": 512,
+      "blocks": [
+        {
+          "w": 32,
+          "colorIndex": 0,
+          "type": "slopeDownLeft"
+        }
+      ]
+    },
+    {
+      "x": 736,
+      "y": 544,
+      "blocks": [
+        {
+          "w": 96,
+          "colorIndex": 0
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "x": 96,
+      "y": 160,
+      "direction": 1,
+      "colorIndex": 0
+    }
+  ]
+}

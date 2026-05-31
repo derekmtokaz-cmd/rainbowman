@@ -25,9 +25,17 @@
         </div>
       </header>
 
-      <canvas id="game" width="1200" height="675" aria-label="Rainbow platformer game"></canvas>
+      <section class="game-layout" aria-label="Rainbowman game area">
+        <div class="game-stage">
+          <canvas id="game" width="1200" height="675" aria-label="Rainbow platformer game"></canvas>
+          <p id="status" class="status" aria-live="polite">Current color: Red</p>
+        </div>
 
-      <p id="status" class="status" aria-live="polite">Current color: Red</p>
+        <aside class="level-sidebar" aria-label="Level selector">
+          <h2>Levels</h2>
+          <div id="levelList" class="level-list"></div>
+        </aside>
+      </section>
     </main>
 
     <script src="game.js"></script>

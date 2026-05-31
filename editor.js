@@ -31,6 +31,8 @@ const PICK_TOLERANCE = 10;
 const LEVEL_LIBRARY_STORAGE_KEY = "rainbowman.levels.v1";
 const GOAL_COLOR_INDEX = "goal";
 const ROTATING_COLOR_INDEX = "rotate";
+const SLOPE_DOWN_RIGHT_TYPE = "slopeDownRight";
+const SLOPE_DOWN_LEFT_TYPE = "slopeDownLeft";
 
 const MASTER_COLORS = [
   { name: "Red", value: "#ff3b30" },
@@ -247,6 +249,9 @@ function drawTrayPreviews() {
   for (const preview of assetTrayEl.querySelectorAll(".platform-preview")) {
     preview.style.background = color;
   }
+  for (const preview of assetTrayEl.querySelectorAll(".slope-preview")) {
+    preview.style.background = isSpecialPlatformColor(activeColorIndex) ? getActiveColorValue(0) : color;
+  }
   for (const preview of assetTrayEl.querySelectorAll(".mini-enemy")) {
     preview.style.background = isSpecialPlatformColor(activeColorIndex) ? getActiveColorValue(0) : color;
   }
@@ -373,7 +378,14 @@ function createTrayAsset(tile) {
   const kind = tile.dataset.asset;
 
   if (kind === "block") {
-    return { kind, w: Number(tile.dataset.width), h: TILE, colorIndex: activeColorIndex };
+    const type = normalizeBlockType(tile.dataset.type);
+    return {
+      kind,
+      w: isSlopeType(type) ? TILE : Number(tile.dataset.width),
+      h: TILE,
+      colorIndex: type && isSpecialPlatformColor(activeColorIndex) ? 0 : activeColorIndex,
+      type,
+    };
   }
 
   if (kind === "enemy") {
@@ -399,7 +411,13 @@ function commitTrayAsset(template, point) {
   const rect = getSnappedRect(template, point, template.w / 2, template.h / 2);
 
   if (template.kind === "block") {
-    const block = createBlock({ x: rect.x, y: rect.y, w: template.w, colorIndex: template.colorIndex });
+    const block = createBlock({
+      x: rect.x,
+      y: rect.y,
+      w: template.w,
+      colorIndex: template.colorIndex,
+      type: template.type,
+    });
     draft.blocks = draft.blocks.filter((existing) => !blocksOverlap(existing, block));
     draft.blocks.push(block);
     sortBlocks();
@@ -750,17 +768,24 @@ function buildPlatformClusters() {
   const platforms = [];
 
   for (const block of sorted) {
+    const exportBlock = createExportBlock(block);
     const last = platforms[platforms.length - 1];
     const lastRight = last ? last.x + last.blocks.reduce((total, item) => total + item.w, 0) : 0;
 
     if (last && last.y === block.y && lastRight === block.x) {
-      last.blocks.push({ w: block.w, colorIndex: block.colorIndex });
+      last.blocks.push(exportBlock);
     } else {
-      platforms.push({ x: block.x, y: block.y, blocks: [{ w: block.w, colorIndex: block.colorIndex }] });
+      platforms.push({ x: block.x, y: block.y, blocks: [exportBlock] });
     }
   }
 
   return platforms;
+}
+
+function createExportBlock(block) {
+  const exported = { w: block.w, colorIndex: block.colorIndex };
+  if (isSlopeBlock(block)) exported.type = block.type;
+  return exported;
 }
 
 function flattenPlatforms(platforms) {
@@ -776,6 +801,7 @@ function flattenPlatforms(platforms) {
           y: platform.y,
           w: block.w,
           colorIndex: normalizeBlockColorIndex(block.colorIndex),
+          type: normalizeBlockType(block.type),
         }),
       });
       x += block.w;
@@ -791,13 +817,15 @@ function sanitizePalette(palette) {
 }
 
 function createBlock(data) {
+  const type = normalizeBlockType(data.type);
   return {
     id: data.id ?? nextBlockId++,
     x: data.x,
     y: data.y,
-    w: data.w,
+    w: isSlopeType(type) ? TILE : data.w,
     h: TILE,
     colorIndex: normalizeBlockColorIndex(data.colorIndex),
+    type,
   };
 }
 
@@ -805,6 +833,10 @@ function normalizeBlockColorIndex(colorIndex) {
   if (isGoalColor(colorIndex)) return GOAL_COLOR_INDEX;
   if (isRotatingColor(colorIndex)) return ROTATING_COLOR_INDEX;
   return Math.min(colorIndex ?? 0, draft.activePalette.length - 1);
+}
+
+function normalizeBlockType(type) {
+  return isSlopeType(type) ? type : null;
 }
 
 function ensureBlockIds() {
@@ -890,15 +922,17 @@ function drawBackground() {
 
 function drawBlocks() {
   for (const block of draft.blocks) {
-    drawPlatformBlock(block.x, block.y, block.w, block.colorIndex, 1);
+    drawPlatformBlock(block.x, block.y, block.w, block.colorIndex, 1, block.type);
   }
 }
 
-function drawPlatformBlock(x, y, w, colorIndex, alpha) {
+function drawPlatformBlock(x, y, w, colorIndex, alpha, type = null) {
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  if (isRotatingColor(colorIndex)) {
+  if (isSlopeType(type)) {
+    drawSlopeBlock(x, y, getActiveColorValue(colorIndex), type);
+  } else if (isRotatingColor(colorIndex)) {
     drawRotatingPlatformBlock(x, y, w);
     ctx.globalAlpha = alpha;
   } else {
@@ -906,17 +940,52 @@ function drawPlatformBlock(x, y, w, colorIndex, alpha) {
     ctx.fillRect(x, y, w, TILE);
   }
 
-  if (!isRotatingColor(colorIndex)) {
+  if (!isRotatingColor(colorIndex) && !isSlopeType(type)) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
     ctx.fillRect(x + 5, y + 4, Math.max(0, w - 10), 4);
   }
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.26)";
-  ctx.fillRect(x, y + TILE - 7, w, 7);
+  if (!isSlopeType(type)) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.26)";
+    ctx.fillRect(x, y + TILE - 7, w, 7);
+    ctx.strokeStyle = "#07101c";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, TILE - 2);
+  }
+
+  ctx.restore();
+}
+
+function drawSlopeBlock(x, y, color, type) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  if (isSlopeDownLeftType(type)) {
+    ctx.moveTo(x + TILE, y);
+    ctx.lineTo(x + TILE, y + TILE);
+    ctx.lineTo(x, y + TILE);
+  } else {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + TILE, y + TILE);
+    ctx.lineTo(x, y + TILE);
+  }
+  ctx.closePath();
+  ctx.fill();
+
   ctx.strokeStyle = "#07101c";
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 1, y + 1, w - 2, TILE - 2);
-  ctx.restore();
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if (isSlopeDownLeftType(type)) {
+    ctx.moveTo(x + TILE - 4, y + 5);
+    ctx.lineTo(x + 5, y + TILE - 4);
+  } else {
+    ctx.moveTo(x + 4, y + 5);
+    ctx.lineTo(x + TILE - 5, y + TILE - 4);
+  }
+  ctx.stroke();
 }
 
 function drawRotatingPlatformBlock(x, y, w) {
@@ -929,10 +998,6 @@ function drawRotatingPlatformBlock(x, y, w) {
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
   ctx.fillRect(x + 5, y + 4, Math.max(0, w - 10), 4);
-  ctx.fillStyle = "rgba(248, 251, 255, 0.82)";
-  ctx.fillRect(x + w - 9, y + 5, 4, 4);
-  ctx.fillRect(x + w - 14, y + 5, 4, 4);
-  ctx.fillRect(x + w - 9, y + 10, 4, 4);
 }
 
 function getPaintPreviewBackground(colorIndex) {
@@ -996,7 +1061,7 @@ function drawDragPreview() {
   const preview = dragState.preview;
 
   if (preview.kind === "block") {
-    drawPlatformBlock(preview.x, preview.y, preview.w, preview.colorIndex, 0.68);
+    drawPlatformBlock(preview.x, preview.y, preview.w, preview.colorIndex, 0.68, preview.type);
   } else if (preview.kind === "enemy") {
     drawEnemy(preview.x, preview.y, preview.colorIndex, preview.direction, 0.68);
   } else if (preview.kind === "start") {
@@ -1113,6 +1178,22 @@ function isGoalColor(colorIndex) {
 
 function isRotatingColor(colorIndex) {
   return colorIndex === ROTATING_COLOR_INDEX;
+}
+
+function isSlopeDownRightType(type) {
+  return type === SLOPE_DOWN_RIGHT_TYPE;
+}
+
+function isSlopeDownLeftType(type) {
+  return type === SLOPE_DOWN_LEFT_TYPE;
+}
+
+function isSlopeType(type) {
+  return isSlopeDownRightType(type) || isSlopeDownLeftType(type);
+}
+
+function isSlopeBlock(block) {
+  return isSlopeType(block.type);
 }
 
 function isSpecialPlatformColor(colorIndex) {
