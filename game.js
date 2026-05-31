@@ -76,6 +76,16 @@ const player = {
   grounded: false,
 };
 
+const jumpSound = new Audio("sounds/jump.mp3");
+const damageSound = new Audio("sounds/damage.mp3");
+const winSound = new Audio("sounds/win.mp3");
+const loseSound = new Audio("sounds/lose.mp3");
+const gameSounds = [jumpSound, damageSound, winSound, loseSound];
+
+for (const sound of gameSounds) {
+  sound.volume = 0.5;
+}
+
 let platforms = [];
 const PLAYER_ACCEL = 1.0;
 const PLAYER_MAX_SPEED = 5.2;
@@ -486,6 +496,7 @@ function updateStatus() {
 function winLevel() {
   if (won) return;
 
+  playSound(winSound);
   won = true;
   player.vx = 0;
   player.vy = 0;
@@ -519,9 +530,18 @@ function isDown(...codes) {
   return codes.some((code) => keys.has(code));
 }
 
+function playSound(sound) {
+  sound.currentTime = 0;
+  const playPromise = sound.play();
+  if (playPromise) {
+    playPromise.catch(() => {});
+  }
+}
+
 function jump() {
   if (!player.grounded || won || gameOver) return;
 
+  playSound(jumpSound);
   player.vy = -13.6;
   player.grounded = false;
   clearMoteRidingState();
@@ -841,6 +861,7 @@ function damagePlayer() {
   if (hp < previousHp) {
     damageTextTimer = DAMAGE_TEXT_DURATION;
     damageText = DAMAGE_TEXT_OPTIONS[Math.floor(Math.random() * DAMAGE_TEXT_OPTIONS.length)];
+    playSound(hp === 0 ? loseSound : damageSound);
   }
 
   updateHealthBar();
