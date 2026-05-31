@@ -63,6 +63,8 @@ let currentGroundSpace = null;
 let enemies = [];
 let ridingEnemy = null;
 let colorLockedMote = null;
+let damageTextTimer = 0;
+let damageText = "Ow!";
 
 const player = {
   x: LEVEL.start.x,
@@ -81,6 +83,8 @@ const RIDING_ACCEL = PLAYER_ACCEL / 2;
 const RIDING_MAX_SPEED = PLAYER_MAX_SPEED / 2;
 const PLAYER_FRICTION = 0.55;
 const PLAYER_STOP_EPSILON = 0.08;
+const DAMAGE_TEXT_DURATION = 30;
+const DAMAGE_TEXT_OPTIONS = ["Ow!", "Ouch!", "Owie!"];
 const MAX_REACHABLE_JUMP_HEIGHT = 150;
 const MAX_REACHABLE_DROP = 120;
 const MAX_REACHABLE_JUMP_DISTANCE = 220;
@@ -100,6 +104,7 @@ function resetGame() {
   hp = MAX_HP;
   ignoreNextLandingDamage = true;
   currentGroundSpace = null;
+  damageTextTimer = 0;
   clearMoteRidingState();
   validatePlatformDensity(LEVEL.platforms);
   validatePlatformReachability(LEVEL.platforms);
@@ -536,6 +541,10 @@ function rectsOverlap(a, b) {
 }
 
 function update() {
+  if (damageTextTimer > 0) {
+    damageTextTimer--;
+  }
+
   if (!won && !gameOver) {
     const previousPlayerY = player.y;
 
@@ -826,7 +835,14 @@ function checkGroundMovementColor() {
 }
 
 function damagePlayer() {
+  const previousHp = hp;
   hp = Math.max(0, hp - 1);
+
+  if (hp < previousHp) {
+    damageTextTimer = DAMAGE_TEXT_DURATION;
+    damageText = DAMAGE_TEXT_OPTIONS[Math.floor(Math.random() * DAMAGE_TEXT_OPTIONS.length)];
+  }
+
   updateHealthBar();
 
   if (hp === 0) {
@@ -891,6 +907,7 @@ function draw() {
   drawPlatforms();
   drawEnemies();
   drawPlayer();
+  drawDamageText();
 
   if (won) {
     drawMessage("Prism reached!", "Press R to restart");
@@ -977,6 +994,25 @@ function drawPlayer() {
   ctx.fillStyle = "#101722";
   ctx.fillRect(px + 7, py + 28, 6, 6);
   ctx.fillRect(px + 17, py + 28, 6, 6);
+}
+
+function drawDamageText() {
+  if (damageTextTimer <= 0) return;
+
+  const x = clamp(player.x + player.w + 8, 4, WIDTH - 56);
+  const y = clamp(player.y + 8, 18, HEIGHT - 8);
+
+  ctx.font = "16px 'Trebuchet MS', Verdana, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+  ctx.fillStyle = "#07101c";
+  ctx.fillText(damageText, x + 2, y + 2);
+
+  ctx.fillStyle = "#f8fbff";
+  ctx.fillText(damageText, x, y);
+
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawMessage(title, subtitle) {
