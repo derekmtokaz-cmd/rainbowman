@@ -77,6 +77,8 @@ let levelStartTime = 0;
 let currentLevelIndex = 0;
 let currentLevelUrl = PUBLISHED_LEVEL_URLS[0];
 let levelSelectorItems = [];
+let lastFrameTime = null;
+let accumulatedFrameTime = 0;
 
 const player = {
   x: LEVEL.start.x,
@@ -103,11 +105,15 @@ const PLAYER_ACCEL = 1.0;
 const PLAYER_MAX_SPEED = 5.2;
 const RIDING_ACCEL = PLAYER_ACCEL / 2;
 const RIDING_MAX_SPEED = PLAYER_MAX_SPEED / 2;
+const RISING_GRAVITY = 0.62;
+const FALLING_GRAVITY = 0.31;
 const PLAYER_FRICTION = 0.55;
 const PLAYER_STOP_EPSILON = 0.08;
 const DAMAGE_TEXT_DURATION = 30;
 const DAMAGE_TEXT_OPTIONS = ["Ow!", "Ouch!", "Owie!"];
 const ROTATING_COLOR_INTERVAL = 5000;
+const FIXED_TIMESTEP_MS = 1000 / 60;
+const MAX_FRAME_DELTA_MS = 250;
 const SLOPE_SLIDE_SPEED = 0.31;
 const SLOPE_SNAP_BUFFER = 1;
 const MAX_REACHABLE_JUMP_HEIGHT = 150;
@@ -797,7 +803,8 @@ function update() {
       clearMoteRidingState();
 
       applyHorizontalInput(PLAYER_ACCEL, PLAYER_MAX_SPEED);
-      player.vy = clamp(player.vy + 0.62, -16, 15);
+      const gravity = player.vy < 0 ? RISING_GRAVITY : FALLING_GRAVITY;
+      player.vy = clamp(player.vy + gravity, -16, 10);
 
       moveHorizontally();
       moveVertically();
@@ -1544,8 +1551,20 @@ function drawMessage(title, subtitle) {
   ctx.textAlign = "start";
 }
 
-function loop() {
-  update();
+function loop(timestamp) {
+  if (lastFrameTime === null) {
+    lastFrameTime = timestamp;
+  }
+
+  const frameDelta = Math.min(timestamp - lastFrameTime, MAX_FRAME_DELTA_MS);
+  lastFrameTime = timestamp;
+  accumulatedFrameTime += frameDelta;
+
+  while (accumulatedFrameTime >= FIXED_TIMESTEP_MS) {
+    update();
+    accumulatedFrameTime -= FIXED_TIMESTEP_MS;
+  }
+
   draw();
   requestAnimationFrame(loop);
 }
@@ -1553,7 +1572,7 @@ function loop() {
 async function initGame() {
   startLevel(0, (await loadPublishedLevel(0)) || DEFAULT_LEVEL);
   await initLevelSelector();
-  loop();
+  requestAnimationFrame(loop);
 }
 
 window.addEventListener("keydown", (event) => {
